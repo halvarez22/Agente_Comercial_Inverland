@@ -12,23 +12,18 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { GoogleGenAI } from '@google/genai';
 import nodemailer from 'nodemailer';
-import fs from 'fs';
-import path from 'path';
 
-// Read firebase-applet-config.json safely to avoid ES Module JSON import crashes on Vercel
-let firebaseConfig: any;
-try {
-  firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
-} catch (e) {
-  try {
-    firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), '..', 'firebase-applet-config.json'), 'utf8'));
-  } catch (err) {
-    firebaseConfig = {
-      projectId: 'agente-comercial-solar',
-      firestoreDatabaseId: '(default)'
-    };
-  }
-}
+// Firebase client config — these are public values (same as firebase-applet-config.json)
+// Hardcoded here to avoid runtime file-read issues in Vercel serverless environment
+const firebaseConfig = {
+  projectId: 'agente-comercial-solar',
+  appId: '1:615897776902:web:1db49554bc7c0699755487',
+  apiKey: 'AIzaSyCMJtiqXdtrt7U-u4M0-PHljFCBQKJwp9g',
+  authDomain: 'agente-comercial-solar.firebaseapp.com',
+  firestoreDatabaseId: '(default)',
+  storageBucket: 'agente-comercial-solar.firebasestorage.app',
+  messagingSenderId: '615897776902',
+};
 
 const app = express();
 
