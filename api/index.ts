@@ -12,7 +12,23 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { GoogleGenAI } from '@google/genai';
 import nodemailer from 'nodemailer';
-import firebaseConfig from '../firebase-applet-config.json';
+import fs from 'fs';
+import path from 'path';
+
+// Read firebase-applet-config.json safely to avoid ES Module JSON import crashes on Vercel
+let firebaseConfig: any;
+try {
+  firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
+} catch (e) {
+  try {
+    firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), '..', 'firebase-applet-config.json'), 'utf8'));
+  } catch (err) {
+    firebaseConfig = {
+      projectId: 'agente-comercial-solar',
+      firestoreDatabaseId: '(default)'
+    };
+  }
+}
 
 const app = express();
 
