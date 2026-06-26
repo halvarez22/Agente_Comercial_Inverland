@@ -1,0 +1,409 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Vercel Serverless Function entry point.
+ * This file contains all Express API routes WITHOUT the Vite dev server or app.listen().
+ * Vercel handles the HTTP server itself and calls this Express app as a handler.
+ */
+
+import express from 'express';
+import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
+import { GoogleGenAI } from '@google/genai';
+import nodemailer from 'nodemailer';
+import firebaseConfig from '../firebase-applet-config.json';
+
+const app = express();
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// --- FIREBASE ADMINISTRATION INITIALIZATION ---
+let db: any = null;
+let isInMemory = false;
+const inMemoryChats: Record<string, any> = {};
+const inMemoryLeads: Record<string, any> = {};
+
+function initFirebase() {
+  // Avoid re-initializing on hot reloads (Vercel reuses instances between requests)
+  if (admin.apps.length > 0) {
+    const dbId = firebaseConfig.firestoreDatabaseId;
+    db = dbId && dbId !== '(default)' ? getFirestore(dbId) : getFirestore();
+    return;
+  }
+
+  try {
+    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    if (serviceAccountJson) {
+      const serviceAccount = JSON.parse(serviceAccountJson);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: firebaseConfig.projectId,
+      });
+      console.log('Firebase Admin SDK initialized from FIREBASE_SERVICE_ACCOUNT_JSON env var');
+    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      admin.initializeApp({ projectId: firebaseConfig.projectId });
+      console.log('Firebase Admin SDK initialized using GOOGLE_APPLICATION_CREDENTIALS');
+    } else {
+      console.warn('No Firebase Admin credentials found. Falling back to in-memory mode.');
+      isInMemory = true;
+      return;
+    }
+    const dbId = firebaseConfig.firestoreDatabaseId;
+    db = dbId && dbId !== '(default)' ? getFirestore(dbId) : getFirestore();
+    console.log(`Firebase Admin SDK connected. Database ID: ${dbId || '(default)'}`);
+  } catch (error) {
+    console.warn('Firebase Admin SDK failed to initialize. Falling back to in-memory mode:', error);
+    isInMemory = true;
+  }
+}
+
+initFirebase();
+
+// --- DB HELPERS ---
+async function getChatDoc(phone: string): Promise<any> {
+  if (isInMemory) {
+    if (!inMemoryChats[phone]) {
+      inMemoryChats[phone] = {
+        id: phone, phone, nombre: 'Cliente', bot_disabled: false,
+        messages: [], last_message_at: new Date().toISOString(),
+      };
+    }
+    return inMemoryChats[phone];
+  }
+  const docRef = db.collection('chats').doc(phone);
+  const doc = await docRef.get();
+  if (!doc.exists) {
+    const newChat = { phone, nombre: 'Cliente', bot_disabled: false, messages: [], last_message_at: new Date().toISOString() };
+    await docRef.set(newChat);
+    return { id: phone, ...newChat };
+  }
+  return { id: doc.id, ...doc.data() };
+}
+
+async function updateChatDoc(phone: string, data: any): Promise<void> {
+  if (isInMemory) { inMemoryChats[phone] = { ...inMemoryChats[phone], ...data }; return; }
+  await db.collection('chats').doc(phone).set(data, { merge: true });
+}
+
+async function createQualifiedLead(lead: any): Promise<void> {
+  const leadId = lead.id || `lead_${Date.now()}`;
+  if (isInMemory) {
+    inMemoryLeads[leadId] = { ...lead, id: leadId, status: 'pending_review', created_at: new Date().toISOString() };
+  } else {
+    await db.collection('qualified_leads').doc(leadId).set({ ...lead, status: 'pending_review', created_at: new Date().toISOString() });
+  }
+}
+
+// --- EMAIL NOTIFICATION ---
+async function sendSalesEmailNotification(lead: any, phone: string): Promise<boolean> {
+  const senderEmail = process.env.SENDER_EMAIL || 'alertas@o3energy.mx';
+  const senderPassword = process.env.SENDER_PASSWORD;
+  const salesEmail = process.env.SALES_EMAIL || 'ventas@o3energy.mx';
+  const smtpServer = process.env.SMTP_SERVER || 'smtp.gmail.com';
+  const smtpPort = parseInt(process.env.SMTP_PORT || '587');
+
+  const subject = `🔥 Nuevo Lead Calificado: ${lead.nombre || 'Cliente'} (${lead.monto_recibo || 'Sin monto'})`;
+  const bodyHtml = `
+    <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; margin: 0 auto;">
+      <div style="background-color: #ea580c; color: white; padding: 24px; text-align: center;">
+        <h1 style="margin: 0; font-size: 20px;">🔥 ¡Nuevo Lead Calificado!</h1>
+        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">O3 Energy Sales Automation AI</p>
+      </div>
+      <div style="padding: 24px; color: #334155;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr><td style="padding: 10px 0; font-weight: bold; color: #64748b;">Nombre:</td><td style="padding: 10px 0;">${lead.nombre}</td></tr>
+          <tr><td style="padding: 10px 0; font-weight: bold; color: #64748b;">WhatsApp:</td><td style="padding: 10px 0; font-family: monospace;">+${phone}</td></tr>
+          <tr><td style="padding: 10px 0; font-weight: bold; color: #64748b;">Gasto CFE:</td><td style="padding: 10px 0; color: #ea580c; font-weight: bold;">${lead.monto_recibo}</td></tr>
+          <tr><td style="padding: 10px 0; font-weight: bold; color: #64748b;">Sistema:</td><td style="padding: 10px 0;">${lead.sistema_estimado}</td></tr>
+          <tr><td style="padding: 10px 0; font-weight: bold; color: #64748b;">Costo:</td><td style="padding: 10px 0; color: #ea580c; font-weight: bold;">${lead.costo_estimado}</td></tr>
+        </table>
+        <div style="text-align: center; margin-top: 24px;">
+          <a href="https://wa.me/${phone}" style="background-color: #ea580c; color: white; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: bold;">💬 Atender en WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (!senderPassword) {
+    console.log(`[SMTP SIMULACIÓN] Lead calificado: ${lead.nombre} (${salesEmail})`);
+    return true;
+  }
+  try {
+    const transporter = nodemailer.createTransport({ host: smtpServer, port: smtpPort, secure: smtpPort === 465, auth: { user: senderEmail, pass: senderPassword } });
+    await transporter.sendMail({ from: `"Alertas O3 Energy AI" <${senderEmail}>`, to: salesEmail, subject, html: bodyHtml });
+    return true;
+  } catch (err) {
+    console.error('[SMTP ERROR]', err);
+    return false;
+  }
+}
+
+// --- WHATSAPP CLOUD API ---
+async function sendWhatsAppMessage(phone: string, text: string): Promise<boolean> {
+  const token = process.env.WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (!token || !phoneNumberId) {
+    console.log(`[WHATSAPP SIMULACIÓN] Para +${phone}: ${text.substring(0, 60)}...`);
+    return true;
+  }
+  try {
+    const response = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: phone, type: 'text', text: { preview_url: false, body: text } }),
+    });
+    const data = await response.json() as any;
+    if (response.ok) { console.log(`[WHATSAPP OK] Mensaje a +${phone}`); return true; }
+    console.error('[WHATSAPP ERROR]', data);
+    return false;
+  } catch (err) {
+    console.error('[WHATSAPP EXCEPCIÓN]', err);
+    return false;
+  }
+}
+
+// --- GEMINI CLIENT ---
+let aiClient: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('GEMINI_API_KEY no configurada en las variables de entorno.');
+    aiClient = new GoogleGenAI({ apiKey });
+  }
+  return aiClient;
+}
+
+// --- SYSTEM PROMPT ---
+const SYSTEM_INSTRUCTION = `
+Eres un asesor de ventas experto e inteligente de "O3 Energy México", una empresa líder de ingeniería en energía solar enfocada en instalar sistemas fotovoltaicos de alta calidad para hogares y comercios. Tu objetivo es calificar y orientar con calidez a los interesados en reducir su recibo de luz en México.
+
+Sigue rigurosamente estas pautas en español de México, manteniendo un tono profesional, amable y de confianza:
+
+1. **Objetivos de Calificación (Descubrimiento)**:
+   - Sé cálido e inicia saludando amigablemente.
+   - Pregunta de forma natural el nombre del usuario si aún no lo tienes.
+   - Descubre sutilmente si el usuario es el dueño de la propiedad o casa (los paneles requieren la aprobación del propietario).
+   - Descubre de cuánto es su gasto o recibo de electricidad promedio, ya sea al mes o al bimestre (monto en pesos mexicanos MXN).
+
+2. **REGLA DE COTIZACIÓN (Gasto mayor a $2,500 MXN)**:
+   - Si el gasto del usuario es superior a $2,500 MXN mensuales/bimestrales, debes calcular una estimación rápida:
+     - Por ejemplo, si gasta aproximadamente $3,000 MXN bimestrales, dile que se estima un sistema de 4 a 6 paneles solares con un costo aproximado de $80,000 MXN y un retorno de inversión a unos 3 años (ahorrando hasta el 95% de su recibo). Adapta proporcionalmente el costo y cantidad si gastan más.
+     - Es un requerimiento OBLIGATORIO y estricto que enfatices textualmente la siguiente advertencia para evitar falsas expectativas comerciales:
+       "Este es solo un presupuesto preliminar de arranque, ya que para la cotización real y final se requiere una visita técnica sin costo en su sitio para evaluar la inclinación del techo, sombras y trayectoria eléctrica."
+
+3. **REGLA DE SALIDA (Generación del lead calificado)**:
+   - En el momento en que hayas obtenido las respuestas clave (nombre o "Cliente Interesado", monto de recibo y la confirmación de ser dueño/interesado en pre-cotizar) y le hayas presentado la pre-cotización, debes adjuntar OBLIGATORIAMENTE al final absoluto de tu mensaje el siguiente bloque JSON en este formato de tag:
+     [QUALIFIED_LEAD: {"nombre": "Nombre del cliente", "monto_recibo": "$X,XXX MXN", "sistema_estimado": "X paneles", "costo_estimado": "$XX,XXX MXN"}]
+   - No muestres ni menciones este bloque JSON explícitamente en el diálogo. Solo colócalo al final exacto de tu respuesta.
+
+Mantén tus respuestas relativamente cortas, fáciles de leer en WhatsApp, usando viñetas donde sea conveniente y usando saltos de línea claros.
+`;
+
+function extractQualifiedLead(text: string): { cleanText: string; leadData: any | null } {
+  const match = text.match(/\[QUALIFIED_LEAD:\s*(\{.*?\})\s*\]/s);
+  if (match) {
+    try {
+      const leadData = JSON.parse(match[1].trim());
+      return { cleanText: text.replace(match[0], '').trim(), leadData };
+    } catch (e) { console.error('Error parsing lead JSON:', e); }
+  }
+  return { cleanText: text, leadData: null };
+}
+
+// ─────────────────────────────────────────────
+// ROUTES
+// ─────────────────────────────────────────────
+
+// Webhook verification (GET) – Meta Cloud API
+app.get(['/whatsapp-webhook', '/api/whatsapp-webhook'], (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'O3_ENERGY_MEXICO_TOKEN';
+  if (mode && token) {
+    if (mode === 'subscribe' && token === VERIFY_TOKEN) return res.status(200).send(challenge);
+    return res.sendStatus(403);
+  }
+  return res.status(200).send('O3 Energy Webhook Service Active.');
+});
+
+// Incoming message (POST) – Meta, Twilio or Playground
+app.post(['/whatsapp-webhook', '/api/whatsapp-webhook'], async (req, res) => {
+  let phone = '', text = '', name = 'Cliente O3';
+  const body = req.body;
+
+  if (body.entry?.[0]?.changes?.[0]?.value) {
+    const val = body.entry[0].changes[0].value;
+    if (val.messages?.[0]) {
+      const msg = val.messages[0];
+      phone = msg.from;
+      text = msg.text?.body || msg.button?.text || '';
+      name = val.contacts?.[0]?.profile?.name || 'Cliente WhatsApp';
+    }
+  } else if (body.From && body.Body) {
+    phone = body.From.replace('whatsapp:', '');
+    text = body.Body;
+    name = body.ProfileName || 'Cliente Twilio';
+  } else if (body.phone && body.text) {
+    phone = body.phone;
+    text = body.text;
+    name = body.name || 'Cliente Simulado';
+  }
+
+  if (!phone || !text) return res.status(400).json({ error: 'Faltan parámetros requeridos' });
+  phone = phone.replace(/\+/g, '').replace(/\s+/g, '');
+
+  try {
+    const chatData = await getChatDoc(phone);
+    const userMessage = { sender: 'user' as const, text, timestamp: new Date().toISOString() };
+    const updatedMessages = [...(chatData.messages || []), userMessage];
+    let updatedChat = { ...chatData, nombre: chatData.nombre === 'Cliente' && name !== 'Cliente O3' ? name : chatData.nombre, messages: updatedMessages, last_message_at: new Date().toISOString() };
+
+    if (chatData.bot_disabled) {
+      await updateChatDoc(phone, updatedChat);
+      return res.status(200).json({ status: 'received', message: 'Bot disabled.', chat: updatedChat });
+    }
+
+    let replyText = '';
+    try {
+      const ai = getGeminiClient();
+      const chatHistory = updatedMessages.map(m => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
+      const result = await ai.models.generateContent({ model: 'gemini-2.0-flash', contents: chatHistory, config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.7 } });
+      replyText = result.text || 'Disculpa, tuve un problema procesando tu consulta.';
+    } catch (aiErr) {
+      console.error('Gemini error:', aiErr);
+      replyText = 'Hola, en este momento experimento un problema técnico. Un asesor de O3 Energy te atenderá pronto.';
+    }
+
+    const { cleanText, leadData } = extractQualifiedLead(replyText);
+    let emailSent = false;
+
+    if (leadData) {
+      const newLead = { id: `lead_${phone}`, nombre: leadData.nombre || updatedChat.nombre, phone, monto_recibo: leadData.monto_recibo || '', sistema_estimado: leadData.sistema_estimado || '', costo_estimado: leadData.costo_estimado || '' };
+      await createQualifiedLead(newLead);
+      emailSent = await sendSalesEmailNotification(newLead, phone);
+      updatedChat = { ...updatedChat, nombre: leadData.nombre || updatedChat.nombre, monto_recibo: leadData.monto_recibo, sistema_estimado: leadData.sistema_estimado, costo_estimado: leadData.costo_estimado };
+    }
+
+    updatedChat.messages.push({ sender: 'bot' as const, text: cleanText, timestamp: new Date().toISOString() });
+    await updateChatDoc(phone, updatedChat);
+    await sendWhatsAppMessage(phone, cleanText);
+
+    return res.status(200).json({ status: 'success', reply: cleanText, lead_generated: !!leadData, email_sent: emailSent, chat: updatedChat });
+  } catch (err: any) {
+    console.error('Webhook error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET chats
+app.get('/api/chats', async (_req, res) => {
+  try {
+    if (isInMemory) return res.json(Object.values(inMemoryChats));
+    const snapshot = await db.collection('chats').orderBy('last_message_at', 'desc').get();
+    return res.json(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+// Toggle bot
+app.post('/api/chats/:phone/toggle-bot', async (req, res) => {
+  const { phone } = req.params;
+  const { bot_disabled } = req.body;
+  try {
+    const chat = await getChatDoc(phone);
+    chat.bot_disabled = bot_disabled;
+    await updateChatDoc(phone, chat);
+    return res.json({ success: true, chat });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+// Human agent sends manual message
+app.post('/api/chats/:phone/message', async (req, res) => {
+  const { phone } = req.params;
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: 'Text is required' });
+  try {
+    const chat = await getChatDoc(phone);
+    chat.messages.push({ sender: 'agent' as const, text, timestamp: new Date().toISOString() });
+    chat.last_message_at = new Date().toISOString();
+    chat.bot_disabled = true;
+    await updateChatDoc(phone, chat);
+    await sendWhatsAppMessage(phone, text);
+    return res.json({ success: true, chat });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+// GET leads
+app.get('/api/leads', async (_req, res) => {
+  try {
+    if (isInMemory) return res.json(Object.values(inMemoryLeads));
+    const snapshot = await db.collection('qualified_leads').orderBy('created_at', 'desc').get();
+    return res.json(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+// Copilot query
+app.post('/api/copilot/query', async (req, res) => {
+  const { question, history } = req.body;
+  if (!question) return res.status(400).json({ error: 'Falta la pregunta' });
+  try {
+    let leadsList: any[] = [], chatsList: any[] = [];
+    if (isInMemory) {
+      leadsList = Object.values(inMemoryLeads);
+      chatsList = Object.values(inMemoryChats).map((c: any) => ({ id: c.id, phone: c.phone, nombre: c.nombre, bot_disabled: c.bot_disabled, monto_recibo: c.monto_recibo, sistema_estimado: c.sistema_estimado, costo_estimado: c.costo_estimado, message_count: c.messages?.length || 0, last_message_at: c.last_message_at }));
+    } else {
+      const ls = await db.collection('qualified_leads').orderBy('created_at', 'desc').get();
+      leadsList = ls.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+      const cs = await db.collection('chats').orderBy('last_message_at', 'desc').get();
+      chatsList = cs.docs.map((d: any) => { const data = d.data(); return { id: d.id, phone: data.phone, nombre: data.nombre, bot_disabled: data.bot_disabled, monto_recibo: data.monto_recibo, sistema_estimado: data.sistema_estimado, costo_estimado: data.costo_estimado, message_count: data.messages?.length || 0, last_message_at: data.last_message_at }; });
+    }
+    const databaseContext = { qualified_leads: leadsList, chats_metadata: chatsList, current_time: new Date().toISOString(), metadata: { total_leads: leadsList.length, total_chats: chatsList.length, pending_leads: leadsList.filter((l: any) => l.status === 'pending_review').length, contacted_leads: leadsList.filter((l: any) => l.status === 'contacted').length } };
+    const systemInstruction = `Eres el Copiloto Inteligente de Base de Datos de Ventas de "O3 Energy México". Responde con precisión analítica usando ÚNICAMENTE los datos:\n${JSON.stringify(databaseContext, null, 2)}\nUsa formato Markdown con tablas y negritas. Montos en pesos mexicanos. Si está vacío, sugiere usar el Simulador de Webhook.`;
+    const ai = getGeminiClient();
+    const contents: any[] = [...(history || []).map((m: any) => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: m.text }] })), { role: 'user', parts: [{ text: question }] }];
+    const result = await ai.models.generateContent({ model: 'gemini-2.0-flash', contents, config: { systemInstruction, temperature: 0.1 } });
+    return res.json({ answer: result.text || 'No pude procesar la solicitud.' });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+// Mark lead as contacted
+app.post('/api/leads/:id/contacted', async (req, res) => {
+  const { id } = req.params;
+  try {
+    if (isInMemory) { if (inMemoryLeads[id]) inMemoryLeads[id].status = 'contacted'; return res.json({ success: true }); }
+    await db.collection('qualified_leads').doc(id).update({ status: 'contacted' });
+    return res.json({ success: true });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+// Save private notes
+app.post('/api/leads/:id/notes', async (req, res) => {
+  const { id } = req.params;
+  const { private_notes } = req.body;
+  try {
+    if (isInMemory) { if (inMemoryLeads[id]) inMemoryLeads[id].private_notes = private_notes; return res.json({ success: true, private_notes }); }
+    await db.collection('qualified_leads').doc(id).set({ private_notes }, { merge: true });
+    return res.json({ success: true, private_notes });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+// Reset demo data
+app.post('/api/reset-demo', async (_req, res) => {
+  try {
+    if (isInMemory) {
+      Object.keys(inMemoryChats).forEach(k => delete inMemoryChats[k]);
+      Object.keys(inMemoryLeads).forEach(k => delete inMemoryLeads[k]);
+    } else {
+      const chatsSnap = await db.collection('chats').get();
+      for (const doc of chatsSnap.docs) await doc.ref.delete();
+      const leadsSnap = await db.collection('qualified_leads').get();
+      for (const doc of leadsSnap.docs) await doc.ref.delete();
+    }
+    return res.json({ success: true, message: 'Datos reseteados.' });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+// Export the Express app as the Vercel serverless handler
+export default app;
