@@ -7,3 +7,6 @@ coverage/
 .env*
 !.env.example
 firebase-service-account.json
+agente-comercial-solar-firebase-adminsdk-*.json
+meta whatsup.txt
+
