@@ -9,7 +9,7 @@ import { createServer as createViteServer } from 'vite';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
+// Groq is used via native fetch — no SDK import needed
 import nodemailer from 'nodemailer';
 import fs from 'fs';
 import firebaseConfig from './firebase-applet-config.json';
@@ -258,25 +258,38 @@ async function sendWhatsAppMessage(phone: string, text: string): Promise<boolean
   }
 }
 
-// --- GEMINI CLIENT LAZY INITIALIZATION ---
-let aiClient: GoogleGenAI | null = null;
-function getGeminiClient(): GoogleGenAI {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error('CRITICAL: GEMINI_API_KEY environment variable is missing.');
-      throw new Error('GEMINI_API_KEY is not configured in the environment variables. Please add it via the Settings menu.');
-    }
-    aiClient = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
+// --- GROQ CLIENT HELPER ---
+async function callGroqAPI(
+  systemInstruction: string,
+  messages: { role: 'user' | 'assistant'; content: string }[],
+  temperature: number = 0.7
+): Promise<string> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    console.error('CRITICAL: GROQ_API_KEY environment variable is missing.');
+    throw new Error('GROQ_API_KEY is not configured in the environment variables.');
   }
-  return aiClient;
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: systemInstruction },
+        ...messages,
+      ],
+      temperature,
+    }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json() as any;
+    throw new Error(`Groq API error: ${errorData?.error?.message || response.statusText}`);
+  }
+  const data = await response.json() as any;
+  return data.choices?.[0]?.message?.content || '';
 }
 
 // --- O3 ENERGY ASSISTANT PROMPT ---
@@ -401,7 +414,7 @@ app.post(['/whatsapp-webhook', '/api/whatsapp-webhook'], async (req, res) => {
       last_message_at: new Date().toISOString()
     };
 
-    // If bot is disabled, do not reply with Gemini. Just save and reply 200.
+    // If bot is disabled, do not reply with AI. Just save and reply 200.
     if (chatData.bot_disabled) {
       await updateChatDoc(phone, updatedChat);
       return res.status(200).json({
@@ -411,29 +424,16 @@ app.post(['/whatsapp-webhook', '/api/whatsapp-webhook'], async (req, res) => {
       });
     }
 
-    // Call Gemini API with entire history
+    // Call Groq API with entire history
     let replyText = '';
     try {
-      const ai = getGeminiClient();
-      
-      // Map history to Google Gen AI schema (user/model roles)
       const chatHistory = updatedMessages.map(m => ({
-        role: m.sender === 'user' ? 'user' : 'model',
-        parts: [{ text: m.text }]
+        role: (m.sender === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: m.text,
       }));
-
-      const result = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: chatHistory,
-        config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          temperature: 0.7,
-        }
-      });
-
-      replyText = result.text || 'Disculpa, tuve un problema procesando tu consulta. ¿Me lo puedes repetir?';
+      replyText = await callGroqAPI(SYSTEM_INSTRUCTION, chatHistory, 0.7);
     } catch (aiErr: any) {
-      console.error('Gemini API call failed:', aiErr);
+      console.error('Groq API call failed:', aiErr);
       replyText = 'Hola, soy el asistente automatizado de O3 Energy México. En este momento estoy experimentando un mantenimiento técnico, pero un asesor humano te atenderá muy pronto.';
     }
 
@@ -614,7 +614,7 @@ app.post('/api/copilot/query', async (req, res) => {
       });
     }
 
-    // 2. Build the context for Gemini
+    // 2. Build the context for Groq
     const databaseContext = {
       qualified_leads: leadsList,
       chats_metadata: chatsList,
@@ -627,10 +627,7 @@ app.post('/api/copilot/query', async (req, res) => {
       }
     };
 
-    // 3. Initialize Gemini Client
-    const ai = getGeminiClient();
-
-    // 4. Set up system instruction with raw database data
+    // 3. Set up system instruction with raw database data
     const systemInstruction = `
 Eres el Copiloto Inteligente de Base de Datos de Ventas de "O3 Energy México". Tu objetivo es asistir al equipo interno de ventas y administración a buscar, filtrar, calcular, resumir y analizar los leads calificados e historiales de chats que se van alimentando en tiempo real.
 
@@ -647,31 +644,19 @@ Instrucciones para tus respuestas:
 7. Mantén siempre un tono profesional, servicial, motivador y sumamente claro.
 `;
 
-    // 5. Structure conversation content
-    const contents: any[] = [];
+    // 4. Structure conversation history for Groq
+    const chatHistory: { role: 'user' | 'assistant'; content: string }[] = [];
     if (history && Array.isArray(history)) {
       history.forEach((msg: any) => {
-        contents.push({
-          role: msg.sender === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.text }]
+        chatHistory.push({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text,
         });
       });
     }
-    contents.push({
-      role: 'user',
-      parts: [{ text: question }]
-    });
+    chatHistory.push({ role: 'user', content: question });
 
-    const result = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
-      contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
-        temperature: 0.1, // very low temperature for strict factual accuracy
-      }
-    });
-
-    const answer = result.text || 'Disculpa, no logré procesar tu solicitud de búsqueda en la base de datos.';
+    const answer = await callGroqAPI(systemInstruction, chatHistory, 0.1);
     return res.json({ answer });
 
   } catch (err: any) {

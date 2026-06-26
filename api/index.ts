@@ -10,7 +10,6 @@
 import express from 'express';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { GoogleGenAI } from '@google/genai';
 import nodemailer from 'nodemailer';
 
 // Firebase client config — these are public values (same as firebase-applet-config.json)
@@ -175,15 +174,40 @@ async function sendWhatsAppMessage(phone: string, text: string): Promise<boolean
   }
 }
 
-// --- GEMINI CLIENT ---
-let aiClient: GoogleGenAI | null = null;
-function getGeminiClient(): GoogleGenAI {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('GEMINI_API_KEY no configurada en las variables de entorno.');
-    aiClient = new GoogleGenAI({ apiKey });
+// --- GROQ CLIENT HELPER ---
+async function callGroqAPI(
+  systemInstruction: string,
+  messages: { role: string; content: string }[],
+  temperature: number = 0.7
+): Promise<string> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error('GROQ_API_KEY no configurada en las variables de entorno.');
   }
-  return aiClient;
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: systemInstruction },
+        ...messages,
+      ],
+      temperature,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json() as any;
+    throw new Error(`Groq API error: ${errorData?.error?.message || response.statusText}`);
+  }
+
+  const data = await response.json() as any;
+  return data.choices?.[0]?.message?.content || '';
 }
 
 // --- SYSTEM PROMPT ---
@@ -279,12 +303,13 @@ app.post(['/whatsapp-webhook', '/api/whatsapp-webhook'], async (req, res) => {
 
     let replyText = '';
     try {
-      const ai = getGeminiClient();
-      const chatHistory = updatedMessages.map(m => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
-      const result = await ai.models.generateContent({ model: 'gemini-2.0-flash', contents: chatHistory, config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.7 } });
-      replyText = result.text || 'Disculpa, tuve un problema procesando tu consulta.';
+      const chatHistory = updatedMessages.map(m => ({
+        role: m.sender === 'user' ? 'user' as const : 'assistant' as const,
+        content: m.text,
+      }));
+      replyText = await callGroqAPI(SYSTEM_INSTRUCTION, chatHistory, 0.7);
     } catch (aiErr) {
-      console.error('Gemini error:', aiErr);
+      console.error('Groq error:', aiErr);
       replyText = 'Hola, en este momento experimento un problema técnico. Un asesor de O3 Energy te atenderá pronto.';
     }
 
@@ -372,10 +397,20 @@ app.post('/api/copilot/query', async (req, res) => {
     }
     const databaseContext = { qualified_leads: leadsList, chats_metadata: chatsList, current_time: new Date().toISOString(), metadata: { total_leads: leadsList.length, total_chats: chatsList.length, pending_leads: leadsList.filter((l: any) => l.status === 'pending_review').length, contacted_leads: leadsList.filter((l: any) => l.status === 'contacted').length } };
     const systemInstruction = `Eres el Copiloto Inteligente de Base de Datos de Ventas de "O3 Energy México". Responde con precisión analítica usando ÚNICAMENTE los datos:\n${JSON.stringify(databaseContext, null, 2)}\nUsa formato Markdown con tablas y negritas. Montos en pesos mexicanos. Si está vacío, sugiere usar el Simulador de Webhook.`;
-    const ai = getGeminiClient();
-    const contents: any[] = [...(history || []).map((m: any) => ({ role: m.sender === 'user' ? 'user' : 'model', parts: [{ text: m.text }] })), { role: 'user', parts: [{ text: question }] }];
-    const result = await ai.models.generateContent({ model: 'gemini-2.0-flash', contents, config: { systemInstruction, temperature: 0.1 } });
-    return res.json({ answer: result.text || 'No pude procesar la solicitud.' });
+    try {
+      const chatHistory = [
+        ...(history || []).map((m: any) => ({
+          role: m.sender === 'user' ? 'user' as const : 'assistant' as const,
+          content: m.text,
+        })),
+        { role: 'user' as const, content: question }
+      ];
+      const answer = await callGroqAPI(systemInstruction, chatHistory, 0.1);
+      return res.json({ answer });
+    } catch (aiErr: any) {
+      console.error('Groq Copilot error:', aiErr);
+      return res.status(500).json({ error: aiErr.message || 'Error en el Copiloto' });
+    }
   } catch (err: any) { return res.status(500).json({ error: err.message }); }
 });
 
