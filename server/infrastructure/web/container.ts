@@ -53,26 +53,54 @@ async function sendWhatsAppMessage(phone: string, text: string): Promise<boolean
   }
 }
 
-// ─── Repository selection (Firestore vs InMemory) ─────────────────────────
-let convRepo: FirestoreConversationRepository | InMemoryConversationRepository;
-let leadRepo: FirestoreLeadRepository | InMemoryLeadRepository;
+// ─── Repository selection (lazy — evaluated per-request) ─────────────────
+function getRepos() {
+  try {
+    // Try to get the already-initialized Firestore instance
+    const { getFirestore } = require('firebase-admin/firestore');
+    const { getApps } = require('firebase-admin/app');
+    if (getApps().length > 0) {
+      const db = getFirestore();
+      logger.info('[DI] Using Firestore repositories (multi-tenant)');
+      return {
+        convRepo: new FirestoreConversationRepository(db),
+        leadRepo: new FirestoreLeadRepository(db),
+      };
+    }
+  } catch (e: any) {
+    logger.warn('[DI] Could not get Firestore, falling back to InMemory', { error: e.message });
+  }
+  logger.warn('[DI] Firestore not available — using InMemory repositories');
+  return {
+    convRepo: new InMemoryConversationRepository(),
+    leadRepo: new InMemoryLeadRepository(),
+  };
+}
+
+// Keep initRepositories for backward compat (used in local test scripts)
+let _convRepo: FirestoreConversationRepository | InMemoryConversationRepository | undefined;
+let _leadRepo: FirestoreLeadRepository | InMemoryLeadRepository | undefined;
 
 export function initRepositories(db: any | null) {
   if (db) {
-    logger.info('[DI] Using Firestore repositories (multi-tenant)');
-    convRepo = new FirestoreConversationRepository(db);
-    leadRepo = new FirestoreLeadRepository(db);
+    logger.info('[DI] initRepositories: Using Firestore repositories (multi-tenant)');
+    _convRepo = new FirestoreConversationRepository(db);
+    _leadRepo = new FirestoreLeadRepository(db);
   } else {
-    logger.warn('[DI] Firestore not available — using InMemory repositories');
-    convRepo = new InMemoryConversationRepository();
-    leadRepo = new InMemoryLeadRepository();
+    logger.warn('[DI] initRepositories: Firestore not available — using InMemory repositories');
+    _convRepo = new InMemoryConversationRepository();
+    _leadRepo = new InMemoryLeadRepository();
   }
 }
 
 // ─── Use Case Factory ─────────────────────────────────────────────────────
 export function buildReceiveMessageUseCase(): ReceiveMessageUseCase {
-  const orchestrator = new LLMOrchestrator(llmProvider, quoteEngine, leadRepo, convRepo);
-  return new ReceiveMessageUseCase(convRepo, orchestrator, SOFIA_DEFINITION, sendWhatsAppMessage);
+  // Use pre-initialized repos if available (local test), otherwise lazy-load
+  const repos = (_convRepo && _leadRepo)
+    ? { convRepo: _convRepo, leadRepo: _leadRepo }
+    : getRepos();
+  const orchestrator = new LLMOrchestrator(llmProvider, quoteEngine, repos.leadRepo, repos.convRepo);
+  return new ReceiveMessageUseCase(repos.convRepo, orchestrator, SOFIA_DEFINITION, sendWhatsAppMessage);
 }
 
-export { convRepo, leadRepo };
+export { _convRepo as convRepo, _leadRepo as leadRepo };
