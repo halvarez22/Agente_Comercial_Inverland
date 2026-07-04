@@ -1,0 +1,148 @@
+/**
+ * v2 Routes — Clean Architecture webhook routes (Strangler Pattern).
+ * These run ALONGSIDE the v1 routes, not replacing them.
+ * All new traffic should use /api/v2/ endpoints.
+ * The old /api/whatsapp-webhook remains for backward compatibility.
+ */
+import { Router, Request, Response } from 'express';
+import { AppConfig } from '../../shared/config/AppConfig';
+import { logger } from '../../shared/logger/ConsoleLogger';
+import { buildReceiveMessageUseCase, convRepo, leadRepo } from './container';
+
+const v2Router = Router();
+
+// ─── Health & Telemetry ────────────────────────────────────────────────────
+v2Router.get('/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', version: '2.0.0', timestamp: new Date().toISOString() });
+});
+
+v2Router.get('/ready', (_req: Request, res: Response) => {
+  const groqConfigured = !!AppConfig.groq.apiKey;
+  const metaConfigured = !!AppConfig.meta.accessToken;
+  res.status(groqConfigured ? 200 : 503).json({
+    ready: groqConfigured,
+    services: {
+      groq: groqConfigured ? 'ok' : 'missing_api_key',
+      whatsapp: metaConfigured ? 'ok' : 'simulation_mode',
+      smtp: !!AppConfig.smtp.pass ? 'ok' : 'simulation_mode',
+    },
+  });
+});
+
+// ─── Webhook Verification (GET) ───────────────────────────────────────────
+v2Router.get('/whatsapp-webhook', (req: Request, res: Response) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode === 'subscribe' && token === AppConfig.meta.verifyToken) {
+    logger.info('[v2 Webhook] Meta verification OK');
+    return res.status(200).send(challenge);
+  }
+  return res.sendStatus(403);
+});
+
+// ─── Incoming Message (POST) ──────────────────────────────────────────────
+v2Router.post('/whatsapp-webhook', async (req: Request, res: Response) => {
+  // Respond 200 immediately to Meta to avoid timeout
+  res.status(200).json({ status: 'received' });
+
+  let phone = '', text = '', name = 'Cliente';
+  const body = req.body;
+
+  try {
+    // Meta Cloud API payload
+    if (body.entry?.[0]?.changes?.[0]?.value) {
+      const val = body.entry[0].changes[0].value;
+
+      // Log all events (messages, statuses, delivered, read, failed)
+      const eventType = val.messages ? 'message' : val.statuses ? 'status' : 'other';
+      logger.info('[v2 Webhook] Meta event received', { eventType });
+
+      if (val.messages?.[0]) {
+        const msg = val.messages[0];
+        phone = msg.from;
+        text = msg.text?.body || msg.button?.text || '';
+        name = val.contacts?.[0]?.profile?.name || 'Cliente WhatsApp';
+      } else {
+        // Status event (delivered, read, failed) — log and exit
+        if (val.statuses?.[0]) {
+          logger.info('[v2 Webhook] Status update', val.statuses[0]);
+        }
+        return;
+      }
+    }
+    // Twilio
+    else if (body.From && body.Body) {
+      phone = body.From.replace('whatsapp:', '');
+      text = body.Body;
+      name = body.ProfileName || 'Cliente Twilio';
+    }
+    // Playground / Simulator
+    else if (body.phone && body.text) {
+      phone = body.phone;
+      text = body.text;
+      name = body.name || 'Cliente Simulado';
+    }
+
+    if (!phone || !text) {
+      logger.warn('[v2 Webhook] Missing phone or text, skipping');
+      return;
+    }
+
+    const useCase = buildReceiveMessageUseCase();
+    await useCase.execute({ phone, text, name });
+  } catch (err: any) {
+    logger.error('[v2 Webhook] Unhandled error', { error: err.message, stack: err.stack });
+  }
+});
+
+// ─── Conversations (CRM) ──────────────────────────────────────────────────
+v2Router.get('/chats', async (req: Request, res: Response) => {
+  const tenantId = (req.query.tenantId as string) || AppConfig.tenant.defaultId;
+  try {
+    const chats = await convRepo.findAll(tenantId);
+    return res.json(chats);
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+v2Router.post('/chats/:phone/toggle-bot', async (req: Request, res: Response) => {
+  const { phone } = req.params;
+  const { bot_disabled } = req.body;
+  const tenantId = req.body.tenantId || AppConfig.tenant.defaultId;
+  try {
+    const conv = await convRepo.findByPhone(tenantId, phone);
+    conv.botDisabled = bot_disabled;
+    await convRepo.save(conv);
+    return res.json({ success: true, conv });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+// ─── Leads (CRM) ─────────────────────────────────────────────────────────
+v2Router.get('/leads', async (req: Request, res: Response) => {
+  const tenantId = (req.query.tenantId as string) || AppConfig.tenant.defaultId;
+  try {
+    const leads = await leadRepo.findAll(tenantId);
+    return res.json(leads);
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+v2Router.post('/leads/:id/contacted', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const tenantId = req.body.tenantId || AppConfig.tenant.defaultId;
+  try {
+    await leadRepo.updateStatus(tenantId, id, 'contacted');
+    return res.json({ success: true });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+v2Router.post('/leads/:id/notes', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { private_notes, tenantId } = req.body;
+  const tenant = tenantId || AppConfig.tenant.defaultId;
+  try {
+    await leadRepo.updateNotes(tenant, id, private_notes);
+    return res.json({ success: true });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+export { v2Router };

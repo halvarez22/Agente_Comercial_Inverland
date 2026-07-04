@@ -3,14 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Vercel Serverless Function entry point.
- * This file contains all Express API routes WITHOUT the Vite dev server or app.listen().
- * Vercel handles the HTTP server itself and calls this Express app as a handler.
+ * Architecture: Strangler Pattern — v1 routes remain for backward compat.
+ * All NEW traffic should use /api/v2/* routes (Clean Architecture).
+ * v1 will be deprecated once v2 is validated in production.
  */
 
 import express from 'express';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import nodemailer from 'nodemailer';
+// ─── v2 Architecture (Clean Architecture / Tool Calling) ───────────────────
+import { v2Router } from '../server/infrastructure/web/v2Router';
+import { initRepositories } from '../server/infrastructure/web/container';
 
 // Firebase client config — these are public values (same as firebase-applet-config.json)
 // Hardcoded here to avoid runtime file-read issues in Vercel serverless environment
@@ -67,9 +71,19 @@ function initFirebase() {
     console.warn('Firebase Admin SDK failed to initialize. Falling back to in-memory mode:', error);
     isInMemory = true;
   }
+
+  // Wire Firestore db into v2 repositories (Strangler Pattern)
+  if (!isInMemory && db) {
+    initRepositories(db);
+  } else {
+    initRepositories(null);
+  }
 }
 
 initFirebase();
+
+// ─── Mount v2 Router (Strangler Pattern — new Clean Architecture routes) ───
+app.use('/api/v2', v2Router);
 
 // --- DB HELPERS ---
 async function getChatDoc(phone: string): Promise<any> {
