@@ -265,87 +265,10 @@ function extractQualifiedLead(text: string): { cleanText: string; leadData: any 
 // ROUTES
 // ─────────────────────────────────────────────
 
-// Webhook verification (GET) – Meta Cloud API
-app.get(['/whatsapp-webhook', '/api/whatsapp-webhook'], (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-  const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'O3_ENERGY_MEXICO_TOKEN';
-  if (mode && token) {
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) return res.status(200).send(challenge);
-    return res.sendStatus(403);
-  }
-  return res.status(200).send('O3 Energy Webhook Service Active.');
-});
-
-// Incoming message (POST) – Meta, Twilio or Playground
-app.post(['/whatsapp-webhook', '/api/whatsapp-webhook'], async (req, res) => {
-  let phone = '', text = '', name = 'Cliente O3';
-  const body = req.body;
-
-  if (body.entry?.[0]?.changes?.[0]?.value) {
-    const val = body.entry[0].changes[0].value;
-    if (val.messages?.[0]) {
-      const msg = val.messages[0];
-      phone = msg.from;
-      text = msg.text?.body || msg.button?.text || '';
-      name = val.contacts?.[0]?.profile?.name || 'Cliente WhatsApp';
-    }
-  } else if (body.From && body.Body) {
-    phone = body.From.replace('whatsapp:', '');
-    text = body.Body;
-    name = body.ProfileName || 'Cliente Twilio';
-  } else if (body.phone && body.text) {
-    phone = body.phone;
-    text = body.text;
-    name = body.name || 'Cliente Simulado';
-  }
-
-  if (!phone || !text) return res.status(400).json({ error: 'Faltan parámetros requeridos' });
-  phone = phone.replace(/\+/g, '').replace(/\s+/g, '');
-
-  try {
-    const chatData = await getChatDoc(phone);
-    const userMessage = { sender: 'user' as const, text, timestamp: new Date().toISOString() };
-    const updatedMessages = [...(chatData.messages || []), userMessage];
-    let updatedChat = { ...chatData, nombre: chatData.nombre === 'Cliente' && name !== 'Cliente O3' ? name : chatData.nombre, messages: updatedMessages, last_message_at: new Date().toISOString() };
-
-    if (chatData.bot_disabled) {
-      await updateChatDoc(phone, updatedChat);
-      return res.status(200).json({ status: 'received', message: 'Bot disabled.', chat: updatedChat });
-    }
-
-    let replyText = '';
-    try {
-      const chatHistory = updatedMessages.map(m => ({
-        role: m.sender === 'user' ? 'user' as const : 'assistant' as const,
-        content: m.text,
-      }));
-      replyText = await callGroqAPI(SYSTEM_INSTRUCTION, chatHistory, 0.7);
-    } catch (aiErr) {
-      console.error('Groq error:', aiErr);
-      replyText = 'Hola, en este momento experimento un problema técnico. Un asesor de O3 Energy te atenderá pronto.';
-    }
-
-    const { cleanText, leadData } = extractQualifiedLead(replyText);
-    let emailSent = false;
-
-    if (leadData) {
-      const newLead = { id: `lead_${phone}`, nombre: leadData.nombre || updatedChat.nombre, phone, monto_recibo: leadData.monto_recibo || '', sistema_estimado: leadData.sistema_estimado || '', costo_estimado: leadData.costo_estimado || '' };
-      await createQualifiedLead(newLead);
-      emailSent = await sendSalesEmailNotification(newLead, phone);
-      updatedChat = { ...updatedChat, nombre: leadData.nombre || updatedChat.nombre, monto_recibo: leadData.monto_recibo, sistema_estimado: leadData.sistema_estimado, costo_estimado: leadData.costo_estimado };
-    }
-
-    updatedChat.messages.push({ sender: 'bot' as const, text: cleanText, timestamp: new Date().toISOString() });
-    await updateChatDoc(phone, updatedChat);
-    await sendWhatsAppMessage(phone, cleanText);
-
-    return res.status(200).json({ status: 'success', reply: cleanText, lead_generated: !!leadData, email_sent: emailSent, chat: updatedChat });
-  } catch (err: any) {
-    console.error('Webhook error:', err);
-    return res.status(500).json({ error: err.message });
-  }
+// Webhook verification & incoming message (Redirect to V2)
+app.use(['/whatsapp-webhook', '/api/whatsapp-webhook'], (req, res, next) => {
+  req.url = '/whatsapp-webhook'; // Rewrites the URL so v2Router matches it
+  v2Router(req, res, next);
 });
 
 // GET chats (Updated for Strangler Pattern to read from V2 location)
