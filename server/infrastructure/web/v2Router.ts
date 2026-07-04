@@ -117,6 +117,69 @@ v2Router.post('/chats/:phone/toggle-bot', async (req: Request, res: Response) =>
   } catch (err: any) { return res.status(500).json({ error: err.message }); }
 });
 
+// Human agent sends manual message
+v2Router.post('/chats/:phone/message', async (req: Request, res: Response) => {
+  const { phone } = req.params;
+  const { text } = req.body;
+  const tenantId = req.body.tenantId || AppConfig.tenant.defaultId;
+  if (!text) return res.status(400).json({ error: 'Text is required' });
+  try {
+    const conv = await convRepo.findByPhone(tenantId, phone);
+    conv.messages.push({ sender: 'agent', text, timestamp: new Date().toISOString() });
+    conv.lastMessageAt = new Date().toISOString();
+    conv.botDisabled = true;
+    await convRepo.save(conv);
+    
+    // Send via WhatsApp
+    const { accessToken, phoneNumberId } = AppConfig.meta;
+    if (accessToken && phoneNumberId) {
+      await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to: phone, type: 'text', text: { preview_url: false, body: text } }),
+      });
+    }
+    
+    return res.json({ success: true, conv });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+// ─── Copilot ──────────────────────────────────────────────────────────────
+v2Router.post('/copilot/query', async (req: Request, res: Response) => {
+  const { question, history } = req.body;
+  const tenantId = req.body.tenantId || AppConfig.tenant.defaultId;
+  if (!question) return res.status(400).json({ error: 'Falta la pregunta' });
+  
+  try {
+    const leads = await leadRepo.findAll(tenantId);
+    const chats = await convRepo.findAll(tenantId);
+    
+    const databaseContext = {
+      qualified_leads: leads,
+      chats_metadata: chats.map(c => ({ phone: c.phone, nombre: c.nombre, phase: c.state.phase, botDisabled: c.botDisabled, lastMessageAt: c.lastMessageAt })),
+      current_time: new Date().toISOString(),
+      metadata: { total_leads: leads.length, total_chats: chats.length }
+    };
+    
+    const systemInstruction = `Eres el Copiloto de Ventas. Responde analizando: ${JSON.stringify(databaseContext)}. Usa Markdown y pesos MXN.`;
+    
+    const chatHistory = [
+      { role: 'system', content: systemInstruction },
+      ...(history || []).map((m: any) => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text })),
+      { role: 'user', content: question }
+    ];
+    
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${AppConfig.groq.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: AppConfig.groq.model, messages: chatHistory, temperature: 0.2 }),
+    });
+    
+    const data = await response.json() as any;
+    return res.json({ answer: data.choices?.[0]?.message?.content || '' });
+  } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
 // ─── Leads (CRM) ─────────────────────────────────────────────────────────
 v2Router.get('/leads', async (req: Request, res: Response) => {
   const tenantId = (req.query.tenantId as string) || AppConfig.tenant.defaultId;
@@ -143,6 +206,13 @@ v2Router.post('/leads/:id/notes', async (req: Request, res: Response) => {
     await leadRepo.updateNotes(tenant, id, private_notes);
     return res.json({ success: true });
   } catch (err: any) { return res.status(500).json({ error: err.message }); }
+});
+
+// ─── Utility ─────────────────────────────────────────────────────────────
+v2Router.post('/reset-demo', async (req: Request, res: Response) => {
+  // Solo aplicable a InMemory, para Firestore se requeriría un borrado de colección completo
+  // Simplemente devolvemos OK para que el frontend limpie su estado visual
+  return res.json({ success: true });
 });
 
 export { v2Router };

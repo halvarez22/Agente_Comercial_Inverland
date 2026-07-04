@@ -348,12 +348,25 @@ app.post(['/whatsapp-webhook', '/api/whatsapp-webhook'], async (req, res) => {
   }
 });
 
-// GET chats
+// GET chats (Updated for Strangler Pattern to read from V2 location)
 app.get('/api/chats', async (_req, res) => {
   try {
     if (isInMemory) return res.json(Object.values(inMemoryChats));
-    const snapshot = await db.collection('chats').orderBy('last_message_at', 'desc').get();
-    return res.json(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+    // V2 uses tenants/o3energy_mexico/chats
+    const snapshot = await db.collection('tenants/o3energy_mexico/chats').orderBy('lastMessageAt', 'desc').get();
+    return res.json(snapshot.docs.map((doc: any) => {
+      const data = doc.data();
+      // Map V2 camelCase back to V1 snake_case for the frontend
+      return {
+        id: doc.id,
+        ...data,
+        last_message_at: data.lastMessageAt || data.last_message_at,
+        bot_disabled: data.botDisabled || data.bot_disabled,
+        monto_recibo: data.montoRecibo || data.monto_recibo,
+        sistema_estimado: data.sistemaEstimado || data.sistema_estimado,
+        costo_estimado: data.costoEstimado || data.costo_estimado
+      };
+    }));
   } catch (err: any) { return res.status(500).json({ error: err.message }); }
 });
 
@@ -385,12 +398,24 @@ app.post('/api/chats/:phone/message', async (req, res) => {
   } catch (err: any) { return res.status(500).json({ error: err.message }); }
 });
 
-// GET leads
+// GET leads (Updated for Strangler Pattern to read from V2 location)
 app.get('/api/leads', async (_req, res) => {
   try {
     if (isInMemory) return res.json(Object.values(inMemoryLeads));
-    const snapshot = await db.collection('qualified_leads').orderBy('created_at', 'desc').get();
-    return res.json(snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+    // V2 uses tenants/o3energy_mexico/qualified_leads
+    const snapshot = await db.collection('tenants/o3energy_mexico/qualified_leads').orderBy('createdAt', 'desc').get();
+    return res.json(snapshot.docs.map((doc: any) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.createdAt || data.created_at,
+        monto_recibo: data.montoRecibo || data.monto_recibo,
+        sistema_estimado: data.sistemaEstimado || data.sistema_estimado,
+        costo_estimado: data.costoEstimado || data.costo_estimado,
+        private_notes: data.privateNotes || data.private_notes
+      };
+    }));
   } catch (err: any) { return res.status(500).json({ error: err.message }); }
 });
 
