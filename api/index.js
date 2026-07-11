@@ -1,14 +1,7 @@
-var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
-  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
-}) : x)(function(x) {
-  if (typeof require !== "undefined") return require.apply(this, arguments);
-  throw Error('Dynamic require of "' + x + '" is not supported');
-});
-
 // api_src/index.ts
 import express from "express";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { initializeApp, getApps as getApps2, cert } from "firebase-admin/app";
+import { getFirestore as getFirestore2 } from "firebase-admin/firestore";
 import nodemailer2 from "nodemailer";
 
 // server/infrastructure/web/v2Router.ts
@@ -576,6 +569,8 @@ var SOFIA_DEFINITION = {
 };
 
 // server/infrastructure/web/container.ts
+import { getApps } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 var quoteEngine = new SolarQuoteEngine();
 var llmProvider = new GroqProvider();
 async function sendWhatsAppMessage(phone, text) {
@@ -610,10 +605,8 @@ async function sendWhatsAppMessage(phone, text) {
 }
 function getRepos() {
   try {
-    const { getFirestore: getFirestore2 } = __require("firebase-admin/firestore");
-    const { getApps: getApps2 } = __require("firebase-admin/app");
-    if (getApps2().length > 0) {
-      const db2 = getFirestore2();
+    if (getApps().length > 0) {
+      const db2 = getFirestore();
       logger.info("[DI] Using Firestore repositories (multi-tenant)");
       return {
         convRepo: new FirestoreConversationRepository(db2),
@@ -842,9 +835,9 @@ var isInMemory = false;
 var inMemoryChats = {};
 var inMemoryLeads = {};
 function initFirebase() {
-  if (getApps().length > 0) {
+  if (getApps2().length > 0) {
     const dbId = firebaseConfig.firestoreDatabaseId;
-    db = dbId && dbId !== "(default)" ? getFirestore(dbId) : getFirestore();
+    db = dbId && dbId !== "(default)" ? getFirestore2(dbId) : getFirestore2();
     return;
   }
   try {
@@ -865,7 +858,7 @@ function initFirebase() {
       return;
     }
     const dbId = firebaseConfig.firestoreDatabaseId;
-    db = dbId && dbId !== "(default)" ? getFirestore(dbId) : getFirestore();
+    db = dbId && dbId !== "(default)" ? getFirestore2(dbId) : getFirestore2();
     console.log(`Firebase Admin SDK connected. Database ID: ${dbId || "(default)"}`);
   } catch (error) {
     console.warn("Firebase Admin SDK failed to initialize. Falling back to in-memory mode:", error);
