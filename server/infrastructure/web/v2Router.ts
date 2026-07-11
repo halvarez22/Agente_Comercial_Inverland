@@ -42,10 +42,9 @@ v2Router.get('/whatsapp-webhook', (req: Request, res: Response) => {
 });
 
 // ─── Incoming Message (POST) ──────────────────────────────────────────────
+// NOTE: We process BEFORE responding to avoid Vercel Lambda freezing async
+// operations after res.json() is called. Meta's timeout is 20s; Groq takes ~5-8s.
 v2Router.post('/whatsapp-webhook', async (req: Request, res: Response) => {
-  // Respond 200 immediately to Meta to avoid timeout
-  res.status(200).json({ status: 'received' });
-
   let phone = '', text = '', name = 'Cliente';
   const body = req.body;
 
@@ -68,7 +67,7 @@ v2Router.post('/whatsapp-webhook', async (req: Request, res: Response) => {
         if (val.statuses?.[0]) {
           logger.info('[v2 Webhook] Status update', val.statuses[0]);
         }
-        return;
+        return res.status(200).json({ status: 'received' });
       }
     }
     // Twilio
@@ -86,14 +85,18 @@ v2Router.post('/whatsapp-webhook', async (req: Request, res: Response) => {
 
     if (!phone || !text) {
       logger.warn('[v2 Webhook] Missing phone or text, skipping');
-      return;
+      return res.status(200).json({ status: 'received' });
     }
 
+    // Run use case BEFORE responding — ensures Vercel doesn't freeze the Lambda
     const useCase = buildReceiveMessageUseCase();
     await useCase.execute({ phone, text, name });
   } catch (err: any) {
     logger.error('[v2 Webhook] Unhandled error', { error: err.message, stack: err.stack });
   }
+
+  // Always return 200 to Meta (prevents retries even on internal errors)
+  return res.status(200).json({ status: 'received' });
 });
 
 // ─── Conversations (CRM) ──────────────────────────────────────────────────

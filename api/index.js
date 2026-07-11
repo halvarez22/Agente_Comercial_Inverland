@@ -669,7 +669,6 @@ v2Router.get("/whatsapp-webhook", (req, res) => {
   return res.sendStatus(403);
 });
 v2Router.post("/whatsapp-webhook", async (req, res) => {
-  res.status(200).json({ status: "received" });
   let phone = "", text = "", name = "Cliente";
   const body = req.body;
   try {
@@ -686,7 +685,7 @@ v2Router.post("/whatsapp-webhook", async (req, res) => {
         if (val.statuses?.[0]) {
           logger.info("[v2 Webhook] Status update", val.statuses[0]);
         }
-        return;
+        return res.status(200).json({ status: "received" });
       }
     } else if (body.From && body.Body) {
       phone = body.From.replace("whatsapp:", "");
@@ -699,13 +698,14 @@ v2Router.post("/whatsapp-webhook", async (req, res) => {
     }
     if (!phone || !text) {
       logger.warn("[v2 Webhook] Missing phone or text, skipping");
-      return;
+      return res.status(200).json({ status: "received" });
     }
     const useCase = buildReceiveMessageUseCase();
     await useCase.execute({ phone, text, name });
   } catch (err) {
     logger.error("[v2 Webhook] Unhandled error", { error: err.message, stack: err.stack });
   }
+  return res.status(200).json({ status: "received" });
 });
 v2Router.get("/chats", async (req, res) => {
   const tenantId = req.query.tenantId || AppConfig.tenant.defaultId;
