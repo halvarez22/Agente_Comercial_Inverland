@@ -9,10 +9,10 @@ import { createServer as createViteServer } from 'vite';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import dotenv from 'dotenv';
-// Groq is used via native fetch — no SDK import needed
 import nodemailer from 'nodemailer';
 import fs from 'fs';
 import firebaseConfig from './firebase-applet-config.json';
+import { buildReceiveMessageUseCase, initRepositories } from './server/infrastructure/web/container.js';
 
 dotenv.config();
 
@@ -64,6 +64,9 @@ try {
   console.warn('Firebase Admin SDK failed to initialize. Falling back to in-memory mode:', error);
   isInMemory = true;
 }
+
+// Wire the clean-architecture container to the same Firebase state
+initRepositories(db);
 
 // Helper to access chats collection
 async function getChatDoc(phone: string): Promise<any> {
@@ -482,21 +485,25 @@ app.get(['/whatsapp-webhook', '/api/whatsapp-webhook'], (req, res) => {
 });
 
 // Incoming Webhook (POST) - Supports Meta Cloud, Twilio and Custom formats
+// Uses LLMOrchestrator + SolarQuoteEngine (Tool Calling) — same as Vercel/api/index.js
 app.post(['/whatsapp-webhook', '/api/whatsapp-webhook'], async (req, res) => {
   let phone = '';
   let text = '';
-  let name = 'Cliente O3';
+  let name = 'Cliente';
 
   const body = req.body;
 
   // 1. Meta / Facebook Cloud API Payload
-  if (body.entry && body.entry[0]?.changes?.[0]?.value) {
+  if (body.entry?.[0]?.changes?.[0]?.value) {
     const val = body.entry[0].changes[0].value;
     if (val.messages?.[0]) {
       const msg = val.messages[0];
       phone = msg.from;
       text = msg.text?.body || msg.button?.text || '';
       name = val.contacts?.[0]?.profile?.name || 'Cliente WhatsApp';
+    } else {
+      // Status update — ack and ignore
+      return res.status(200).json({ status: 'received' });
     }
   }
   // 2. Twilio Webhook Form/JSON Payload
@@ -505,7 +512,7 @@ app.post(['/whatsapp-webhook', '/api/whatsapp-webhook'], async (req, res) => {
     text = body.Body;
     name = body.ProfileName || 'Cliente Twilio';
   }
-  // 3. Custom / Playground API Payload
+  // 3. Custom / Playground / Simulator Payload
   else if (body.phone && body.text) {
     phone = body.phone;
     text = body.text;
@@ -516,101 +523,36 @@ app.post(['/whatsapp-webhook', '/api/whatsapp-webhook'], async (req, res) => {
     return res.status(400).json({ error: 'Faltan parámetros requeridos (teléfono o texto)' });
   }
 
-  // Sanitize phone number
   phone = phone.replace(/\+/g, '').replace(/\s+/g, '');
 
   try {
+    // Check bot-disabled flag via legacy store first
     const chatData = await getChatDoc(phone);
-    
-    // Register the user's incoming message
-    const userMessage = {
-      sender: 'user' as const,
-      text: text,
-      timestamp: new Date().toISOString()
-    };
-    
-    const updatedMessages = [...(chatData.messages || []), userMessage];
-    
-    // Default chat structure updates
-    let updatedChat = {
-      ...chatData,
-      nombre: chatData.nombre === 'Cliente' && name !== 'Cliente O3' ? name : chatData.nombre,
-      messages: updatedMessages,
-      last_message_at: new Date().toISOString()
-    };
-
-    // If bot is disabled, do not reply with AI. Just save and reply 200.
     if (chatData.bot_disabled) {
-      await updateChatDoc(phone, updatedChat);
-      return res.status(200).json({
-        status: 'received',
-        message: 'Bot disabled. Handled manually.',
-        chat: updatedChat
-      });
+      // Save the incoming message but don't reply with AI
+      const userMessage = { sender: 'user' as const, text, timestamp: new Date().toISOString() };
+      chatData.messages = [...(chatData.messages || []), userMessage];
+      chatData.last_message_at = new Date().toISOString();
+      await updateChatDoc(phone, chatData);
+      return res.status(200).json({ status: 'received', message: 'Bot disabled. Handled manually.', chat: chatData });
     }
 
-    // Call Groq API with entire history
-    let replyText = '';
-    try {
-      const chatHistory = updatedMessages.map(m => ({
-        role: (m.sender === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-        content: m.text,
-      }));
-      replyText = await callGroqAPI(SYSTEM_INSTRUCTION, chatHistory, 0.7);
-    } catch (aiErr: any) {
-      console.error('Groq API call failed:', aiErr);
-      replyText = 'Hola, soy el asistente automatizado de O3 Energy México. En este momento estoy experimentando un mantenimiento técnico, pero un asesor humano te atenderá muy pronto.';
-    }
+    // ── Delegate to the clean-architecture use case (Tool Calling enabled) ──
+    const useCase = buildReceiveMessageUseCase();
+    const result = await useCase.execute({ phone, text, name, tenantId: 'o3energy_mexico' });
 
-    // Check for QUALIFIED_LEAD block
-    const { cleanText, leadData } = extractQualifiedLead(replyText);
-    let emailSent = false;
-
-    // If qualified, save to leads and update chat fields
-    if (leadData) {
-      const leadId = `lead_${phone}`;
-      const newLead = {
-        id: leadId,
-        nombre: leadData.nombre || updatedChat.nombre,
-        phone: phone,
-        monto_recibo: leadData.monto_recibo || '',
-        sistema_estimado: leadData.sistema_estimado || '',
-        costo_estimado: leadData.costo_estimado || '',
-      };
-      
-      await createQualifiedLead(newLead);
-      emailSent = await sendSalesEmailNotification(newLead, phone);
-
-      // Enrich chat document details
-      updatedChat.nombre = leadData.nombre || updatedChat.nombre;
-      updatedChat.monto_recibo = leadData.monto_recibo;
-      updatedChat.sistema_estimado = leadData.sistema_estimado;
-      updatedChat.costo_estimado = leadData.costo_estimado;
-    }
-
-    // Save bot reply
-    const botMessage = {
-      sender: 'bot' as const,
-      text: cleanText,
-      timestamp: new Date().toISOString()
-    };
-    updatedChat.messages.push(botMessage);
-
-    await updateChatDoc(phone, updatedChat);
-
-    // Send the reply physically to the user's WhatsApp if credentials are configured
-    await sendWhatsAppMessage(phone, cleanText);
+    // Read back the saved conversation to mirror into the legacy flat-chat store for the UI
+    const savedChat = await getChatDoc(phone);
 
     return res.status(200).json({
       status: 'success',
-      reply: cleanText,
-      lead_generated: !!leadData,
-      email_sent: emailSent,
-      chat: updatedChat
+      reply: result.reply,
+      lead_generated: result.leadGenerated,
+      chat: savedChat,
     });
 
   } catch (err: any) {
-    console.error('Webhook error processing:', err);
+    console.error('[Webhook] Error processing message:', err);
     return res.status(500).json({ error: err.message });
   }
 });
