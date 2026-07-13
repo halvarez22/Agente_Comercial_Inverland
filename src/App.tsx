@@ -921,24 +921,6 @@ export default function App() {
             </span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('guide')}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 text-left border cursor-pointer ${
-              activeTab === 'guide'
-                ? isDarkMode
-                  ? 'bg-orange-500/10 text-orange-500 border-orange-500/30 font-medium shadow-lg shadow-orange-950/30'
-                  : 'bg-orange-50 text-orange-600 border-orange-500/30 font-semibold shadow-md shadow-orange-100'
-                : isDarkMode
-                ? 'text-slate-400 border-transparent hover:bg-slate-900/40 hover:text-slate-200'
-                : 'text-slate-600 border-transparent hover:bg-slate-100 hover:text-slate-800'
-            }`}
-          >
-            <div className="flex items-center space-x-3">
-              <BookOpen className="h-4 w-4" />
-              <span className="text-sm font-medium">Código Python / Guía</span>
-            </div>
-            <Code className="h-3.5 w-3.5 text-orange-500" />
-          </button>
         </nav>
 
         {/* Footer / Status Area */}
