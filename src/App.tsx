@@ -803,17 +803,9 @@ export default function App() {
         isDarkMode ? 'bg-slate-900 border-slate-800/80 text-slate-250' : 'bg-white border-slate-200 text-slate-700'
       }`}>
         {/* Header / Logo */}
-        <div className={`p-6 border-b transition-colors duration-200 ${isDarkMode ? 'border-slate-800/80' : 'border-slate-200'}`}>
-          <div className="flex items-center space-x-3">
-            <div className="bg-orange-500/10 p-2 rounded-xl text-orange-500 border border-orange-500/30 shadow-md">
-              <Zap className="h-5 w-5 fill-current animate-pulse" />
-            </div>
-            <div>
-              <h1 className={`font-bold text-lg leading-tight tracking-tight transition-colors duration-200 ${
-                isDarkMode ? 'text-white' : 'text-slate-900'
-              }`}>O3 Energy</h1>
-              <span className="text-[10px] text-orange-500 font-semibold tracking-wider uppercase">México AI Sales</span>
-            </div>
+        <div className={`p-6 border-b transition-colors duration-200 flex justify-center ${isDarkMode ? 'border-slate-800/80' : 'border-slate-200'}`}>
+          <div className="flex-shrink-0 bg-white/5 p-3 rounded-xl border border-white/5 shadow-sm w-full flex justify-center items-center">
+            <img src="/images/logo-o3.png" alt="O3 Energy Logo" className="h-16 w-auto object-contain" />
           </div>
         </div>
 
