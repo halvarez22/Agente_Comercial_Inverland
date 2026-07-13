@@ -38,6 +38,8 @@ export class SolarQuoteEngine implements IQuoteEngine {
       roiYears,
       monthlySavings,
       annualSavings: Math.round(annualSavings),
+      monthlySavingsFormatted: `$${monthlySavings.toLocaleString('es-MX')} MXN`,
+      annualSavingsFormatted: `$${Math.round(annualSavings).toLocaleString('es-MX')} MXN`,
       costFormatted: `$${estimatedCost.toLocaleString('es-MX')} MXN`,
       systemDescription: `${panels} paneles solares (sistema de ${systemKwp.toFixed(1)} kWp)`,
       disclaimer:

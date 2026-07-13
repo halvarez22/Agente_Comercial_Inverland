@@ -160,6 +160,8 @@ var SolarQuoteEngine = class {
       roiYears,
       monthlySavings,
       annualSavings: Math.round(annualSavings),
+      monthlySavingsFormatted: `$${monthlySavings.toLocaleString("es-MX")} MXN`,
+      annualSavingsFormatted: `$${Math.round(annualSavings).toLocaleString("es-MX")} MXN`,
       costFormatted: `$${estimatedCost.toLocaleString("es-MX")} MXN`,
       systemDescription: `${panels} paneles solares (sistema de ${systemKwp.toFixed(1)} kWp)`,
       disclaimer: "Este es un presupuesto preliminar. El costo final depende de la visita t\xE9cnica sin costo en tu sitio (evaluaci\xF3n de inclinaci\xF3n del techo, sombras y trayectoria el\xE9ctrica)."
@@ -540,9 +542,9 @@ Eres Sof\xEDa, asesora de ventas experta de "O3 Energy M\xE9xico", empresa l\xED
 Tu objetivo es guiar al prospecto a trav\xE9s de una conversaci\xF3n natural para:
 1. Presentarte y obtener su nombre.
 2. Confirmar si es propietario del inmueble (requerido para el tr\xE1mite CFE).
-3. Descubrir su gasto mensual/bimestral de luz en pesos MXN.
+3. Descubrir su gasto de luz en pesos MXN y CONFIRMAR EXPL\xCDCITAMENTE si ese gasto es MENSUAL o BIMESTRAL.
 4. Realizar una encuesta t\xE9cnica b\xE1sica: tipo de techo, n\xFAmero de plantas, presencia de sombras/obst\xE1culos, voltaje actual (110V o 220V).
-5. Cuando tengas suficiente informaci\xF3n, DEBES usar la herramienta "calcular_cotizacion_solar" para obtener los n\xFAmeros exactos y presentarlos al cliente.
+5. Cuando tengas suficiente informaci\xF3n y hayas confirmado si el recibo es mensual o bimestral, DEBES usar la herramienta "calcular_cotizacion_solar" para obtener los n\xFAmeros exactos y presentarlos al cliente.
 6. Una vez presentada la cotizaci\xF3n y el cliente muestre inter\xE9s en continuar, usa la herramienta "registrar_prospecto_calificado" para guardar el lead.
 7. Responde dudas usando tu base de conocimiento:
 
@@ -552,8 +554,10 @@ ${faq}
 
 REGLAS IMPORTANTES:
 - Nunca inventes precios ni calcules en tu mente. Siempre usa la herramienta "calcular_cotizacion_solar".
+- Al presentar la cotizaci\xF3n, lee cuidadosamente el JSON de respuesta. Usa exactamente los valores de 'monthlySavingsFormatted' y 'annualSavingsFormatted' para hablar de los ahorros. NO alteres los n\xFAmeros devueltos.
 - Mant\xE9n respuestas cortas y con saltos de l\xEDnea para WhatsApp.
 - Si el usuario ya pas\xF3 la calificaci\xF3n, no vuelvas a pedir su nombre ni su recibo.
+- Si el cliente da un monto de luz, pero no especifica periodo, preg\xFAntale "\xBFEse monto es mensual o bimestral?" antes de cotizar.
 `;
 var SOFIA_DEFINITION = {
   id: "sofia",
@@ -879,17 +883,17 @@ async function getChatDoc(phone) {
         id: phone,
         phone,
         nombre: "Cliente",
-        bot_disabled: false,
+        botDisabled: false,
         messages: [],
-        last_message_at: (/* @__PURE__ */ new Date()).toISOString()
+        lastMessageAt: (/* @__PURE__ */ new Date()).toISOString()
       };
     }
     return inMemoryChats[phone];
   }
-  const docRef = db.collection("chats").doc(phone);
+  const docRef = db.collection("tenants/o3energy_mexico/chats").doc(phone);
   const doc = await docRef.get();
   if (!doc.exists) {
-    const newChat = { phone, nombre: "Cliente", bot_disabled: false, messages: [], last_message_at: (/* @__PURE__ */ new Date()).toISOString() };
+    const newChat = { phone, nombre: "Cliente", botDisabled: false, messages: [], lastMessageAt: (/* @__PURE__ */ new Date()).toISOString() };
     await docRef.set(newChat);
     return { id: phone, ...newChat };
   }
@@ -900,7 +904,7 @@ async function updateChatDoc(phone, data) {
     inMemoryChats[phone] = { ...inMemoryChats[phone], ...data };
     return;
   }
-  await db.collection("chats").doc(phone).set(data, { merge: true });
+  await db.collection("tenants/o3energy_mexico/chats").doc(phone).set(data, { merge: true });
 }
 async function sendWhatsAppMessage2(phone, text) {
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
@@ -967,11 +971,11 @@ app.get("/api/chats", async (_req, res) => {
       return {
         id: doc.id,
         ...data,
-        last_message_at: data.lastMessageAt || data.last_message_at,
-        bot_disabled: data.botDisabled || data.bot_disabled,
-        monto_recibo: data.montoRecibo || data.monto_recibo,
-        sistema_estimado: data.sistemaEstimado || data.sistema_estimado,
-        costo_estimado: data.costoEstimado || data.costo_estimado
+        lastMessageAt: data.lastMessageAt || data.lastMessageAt,
+        botDisabled: data.botDisabled || data.botDisabled,
+        montoRecibo: data.montoRecibo || data.montoRecibo,
+        sistemaEstimado: data.sistemaEstimado || data.sistemaEstimado,
+        costoEstimado: data.costoEstimado || data.costoEstimado
       };
     }));
   } catch (err) {
@@ -980,10 +984,10 @@ app.get("/api/chats", async (_req, res) => {
 });
 app.post("/api/chats/:phone/toggle-bot", async (req, res) => {
   const { phone } = req.params;
-  const { bot_disabled } = req.body;
+  const { botDisabled } = req.body;
   try {
     const chat = await getChatDoc(phone);
-    chat.bot_disabled = bot_disabled;
+    chat.botDisabled = botDisabled;
     await updateChatDoc(phone, chat);
     return res.json({ success: true, chat });
   } catch (err) {
@@ -997,8 +1001,8 @@ app.post("/api/chats/:phone/message", async (req, res) => {
   try {
     const chat = await getChatDoc(phone);
     chat.messages.push({ sender: "agent", text, timestamp: (/* @__PURE__ */ new Date()).toISOString() });
-    chat.last_message_at = (/* @__PURE__ */ new Date()).toISOString();
-    chat.bot_disabled = true;
+    chat.lastMessageAt = (/* @__PURE__ */ new Date()).toISOString();
+    chat.botDisabled = true;
     await updateChatDoc(phone, chat);
     await sendWhatsAppMessage2(phone, text);
     return res.json({ success: true, chat });
@@ -1015,11 +1019,11 @@ app.get("/api/leads", async (_req, res) => {
       return {
         id: doc.id,
         ...data,
-        created_at: data.createdAt || data.created_at,
-        monto_recibo: data.montoRecibo || data.monto_recibo,
-        sistema_estimado: data.sistemaEstimado || data.sistema_estimado,
-        costo_estimado: data.costoEstimado || data.costo_estimado,
-        private_notes: data.privateNotes || data.private_notes
+        createdAt: data.createdAt || data.createdAt,
+        montoRecibo: data.montoRecibo || data.montoRecibo,
+        sistemaEstimado: data.sistemaEstimado || data.sistemaEstimado,
+        costoEstimado: data.costoEstimado || data.costoEstimado,
+        privateNotes: data.privateNotes || data.privateNotes
       };
     }));
   } catch (err) {
@@ -1033,14 +1037,14 @@ app.post("/api/copilot/query", async (req, res) => {
     let leadsList = [], chatsList = [];
     if (isInMemory) {
       leadsList = Object.values(inMemoryLeads);
-      chatsList = Object.values(inMemoryChats).map((c) => ({ id: c.id, phone: c.phone, nombre: c.nombre, bot_disabled: c.bot_disabled, monto_recibo: c.monto_recibo, sistema_estimado: c.sistema_estimado, costo_estimado: c.costo_estimado, message_count: c.messages?.length || 0, last_message_at: c.last_message_at }));
+      chatsList = Object.values(inMemoryChats).map((c) => ({ id: c.id, phone: c.phone, nombre: c.nombre, botDisabled: c.botDisabled, montoRecibo: c.montoRecibo, sistemaEstimado: c.sistemaEstimado, costoEstimado: c.costoEstimado, message_count: c.messages?.length || 0, lastMessageAt: c.lastMessageAt }));
     } else {
-      const ls = await db.collection("qualified_leads").orderBy("created_at", "desc").get();
+      const ls = await db.collection("tenants/o3energy_mexico/qualified_leads").orderBy("createdAt", "desc").get();
       leadsList = ls.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const cs = await db.collection("chats").orderBy("last_message_at", "desc").get();
+      const cs = await db.collection("tenants/o3energy_mexico/chats").orderBy("lastMessageAt", "desc").get();
       chatsList = cs.docs.map((d) => {
         const data = d.data();
-        return { id: d.id, phone: data.phone, nombre: data.nombre, bot_disabled: data.bot_disabled, monto_recibo: data.monto_recibo, sistema_estimado: data.sistema_estimado, costo_estimado: data.costo_estimado, message_count: data.messages?.length || 0, last_message_at: data.last_message_at };
+        return { id: d.id, phone: data.phone, nombre: data.nombre, botDisabled: data.botDisabled, montoRecibo: data.montoRecibo, sistemaEstimado: data.sistemaEstimado, costoEstimado: data.costoEstimado, message_count: data.messages?.length || 0, lastMessageAt: data.lastMessageAt };
       });
     }
     const databaseContext = { qualified_leads: leadsList, chats_metadata: chatsList, current_time: (/* @__PURE__ */ new Date()).toISOString(), metadata: { total_leads: leadsList.length, total_chats: chatsList.length, pending_leads: leadsList.filter((l) => l.status === "pending_review").length, contacted_leads: leadsList.filter((l) => l.status === "contacted").length } };
@@ -1072,7 +1076,7 @@ app.post("/api/leads/:id/contacted", async (req, res) => {
       if (inMemoryLeads[id]) inMemoryLeads[id].status = "contacted";
       return res.json({ success: true });
     }
-    await db.collection("qualified_leads").doc(id).update({ status: "contacted" });
+    await db.collection("tenants/o3energy_mexico/qualified_leads").doc(id).update({ status: "contacted" });
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -1080,14 +1084,14 @@ app.post("/api/leads/:id/contacted", async (req, res) => {
 });
 app.post("/api/leads/:id/notes", async (req, res) => {
   const { id } = req.params;
-  const { private_notes } = req.body;
+  const { privateNotes } = req.body;
   try {
     if (isInMemory) {
-      if (inMemoryLeads[id]) inMemoryLeads[id].private_notes = private_notes;
-      return res.json({ success: true, private_notes });
+      if (inMemoryLeads[id]) inMemoryLeads[id].privateNotes = privateNotes;
+      return res.json({ success: true, privateNotes });
     }
-    await db.collection("qualified_leads").doc(id).set({ private_notes }, { merge: true });
-    return res.json({ success: true, private_notes });
+    await db.collection("tenants/o3energy_mexico/qualified_leads").doc(id).set({ privateNotes }, { merge: true });
+    return res.json({ success: true, privateNotes });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -1098,9 +1102,9 @@ app.post("/api/reset-demo", async (_req, res) => {
       Object.keys(inMemoryChats).forEach((k) => delete inMemoryChats[k]);
       Object.keys(inMemoryLeads).forEach((k) => delete inMemoryLeads[k]);
     } else {
-      const chatsSnap = await db.collection("chats").get();
+      const chatsSnap = await db.collection("tenants/o3energy_mexico/chats").get();
       for (const doc of chatsSnap.docs) await doc.ref.delete();
-      const leadsSnap = await db.collection("qualified_leads").get();
+      const leadsSnap = await db.collection("tenants/o3energy_mexico/qualified_leads").get();
       for (const doc of leadsSnap.docs) await doc.ref.delete();
     }
     return res.json({ success: true, message: "Datos reseteados." });

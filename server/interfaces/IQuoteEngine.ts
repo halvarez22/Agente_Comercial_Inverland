@@ -6,6 +6,8 @@ export interface QuoteResult {
   roiYears: number;
   monthlySavings: number;
   annualSavings: number;
+  monthlySavingsFormatted: string;
+  annualSavingsFormatted: string;
   costFormatted: string;
   systemDescription: string;
   disclaimer: string;
