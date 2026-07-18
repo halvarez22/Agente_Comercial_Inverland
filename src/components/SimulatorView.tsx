@@ -1,5 +1,5 @@
 import React from 'react';
-import { Send, RefreshCw, Zap, Play, Check, Copy } from 'lucide-react';
+import { Send, RefreshCw, Zap, Play, Check, Copy, Sparkles, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface SimulatorViewProps {
