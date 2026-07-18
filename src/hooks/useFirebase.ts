@@ -69,8 +69,14 @@ export function useFirebase({ onNewLeadNotification }: UseFirebaseProps) {
     };
 
     try {
+      const connectionTimeout = setTimeout(() => {
+        console.warn('Firebase connection timeout (silent error). Switching to HTTP Polling...');
+        startPollingFallback();
+      }, 3500);
+
       const chatsQuery = query(collection(db, 'tenants/o3energy_mexico/chats'), orderBy('lastMessageAt', 'desc'));
       unsubscribeChats = onSnapshot(chatsQuery, (snapshot) => {
+        clearTimeout(connectionTimeout);
         const chatsList: Chat[] = [];
         snapshot.forEach((doc) => {
           chatsList.push({ id: doc.id, ...(doc.data() as any) });
@@ -80,6 +86,7 @@ export function useFirebase({ onNewLeadNotification }: UseFirebaseProps) {
         setIsFirebaseConnected(true);
         setLastRefreshed(new Date().toLocaleTimeString());
       }, (error) => {
+        clearTimeout(connectionTimeout);
         console.warn('Firestore chats subscription failed. Switching to HTTP Polling:', error);
         startPollingFallback();
       });
@@ -115,7 +122,7 @@ export function useFirebase({ onNewLeadNotification }: UseFirebaseProps) {
       });
 
     } catch (err) {
-      console.warn('Failed to subscribe to Firestore natively. Starting fallback polling:', err);
+      console.error('Error initializing Firestore Listeners:', err);
       startPollingFallback();
     }
 
