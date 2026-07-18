@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Search, Bot, Phone, Send, UserCheck, AlertTriangle, ChevronLeft } from 'lucide-react';
+import { MessageSquare, Search, Bot, Phone, Send, UserCheck, AlertTriangle, ChevronLeft, Play, Pause, Layers, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
