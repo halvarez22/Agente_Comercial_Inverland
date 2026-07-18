@@ -1,5 +1,6 @@
 import React from 'react';
 import { Users, TrendingUp, Clock, CheckCircle, DollarSign, Sparkles, Zap, Search, Download, Copy, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { QualifiedLead } from '../types';
 
