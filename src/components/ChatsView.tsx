@@ -76,84 +76,6 @@ export const ChatsView: React.FC<ChatsViewProps> = ({
     }
   };
 
-  // Simulate incoming WhatsApp message
-  const handleSimulateWebhook = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!simPhone.trim() || !simMessage.trim()) return;
-
-    setIsSimulating(true);
-    setSimResponse(null);
-    
-    const payload = {
-      phone: simPhone,
-      text: simMessage,
-      name: simName || 'Cliente Simulado'
-    };
-    
-    setSimPayload(JSON.stringify(payload, null, 2));
-    
-    const logItem = `[${new Date().toLocaleTimeString()}] Enviando mensaje desde +${simPhone}: "${simMessage}"`;
-    setSimulationLog(prev => [logItem, ...prev]);
-
-    try {
-      const response = await fetch('/api/whatsapp-webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setSimResponse(data);
-        
-        const replyLog = `[${new Date().toLocaleTimeString()}] Respuesta recibida de Gemini AI: "${data.reply}"`;
-        const leadLog = data.lead_generated 
-          ? `[­ƒöÑ LEAD CALIFICADO] ┬íSe detect├│ y registr├│ un nuevo prospecto de paneles solares!`
-          : `[­ƒÆ¼ Conversaci├│n en curso] El bot sigue recopilando informaci├│n.`;
-          
-        setSimulationLog(prev => {
-          const logs = [leadLog, replyLog];
-          if (data.email_sent) {
-            logs.unshift(`[­ƒôº EMAIL ENVIADO] ┬íNotificaci├│n por correo enviada con ├®xito al equipo de ventas (ventas@o3energy.mx)!`);
-          }
-          return [...logs, ...prev];
-        });
-        showToast(data.lead_generated ? '­ƒöÑ ┬íNuevo Lead Calificado Detectado!' : 'Mensaje procesado con ├®xito');
-      } else {
-        const errorData = await response.text();
-        setSimulationLog(prev => [`[ÔØî ERROR] Fall├│ el webhook: ${errorData}`, ...prev]);
-        showToast('Error en la simulaci├│n del Webhook');
-      }
-    } catch (err: any) {
-      setSimulationLog(prev => [`[ÔØî ERROR RECHAZADO] No se pudo conectar: ${err.message}`, ...prev]);
-      showToast('Error de red en la simulaci├│n');
-    } finally {
-      setIsSimulating(false);
-      setSimMessage('');
-    }
-  };
-
-  // Reset entire mock Database
-  const handleResetDemo = async () => {
-    if (confirm('┬┐Est├ís seguro de que deseas limpiar todo el historial de chats y los leads calificados? Esta acci├│n vaciar├í la base de datos de pruebas.')) {
-      try {
-        const response = await fetch('/api/reset-demo', { method: 'POST' });
-        if (response.ok) {
-          setChats([]);
-          setLeads([]);
-          setSelectedChatPhone(null);
-          setSimulationLog([]);
-          setSimResponse(null);
-          showToast('­ƒº╣ Base de datos del Playground restablecida con ├®xito.');
-        }
-      } catch (err) {
-        showToast('Error de red al restablecer base de datos.');
-      }
-    }
-  };
-
-  // Set contacted status on lead
-
 
   const selectedChat = chats.find(c => c.phone === selectedChatPhone);
   
@@ -163,37 +85,6 @@ export const ChatsView: React.FC<ChatsViewProps> = ({
     const phoneMatch = chat.phone.includes(searchLower);
     return nombreMatch || phoneMatch;
   });
-
-  // Filter leads based on search
-  const filteredLeads = leads.filter(lead => {
-    const searchLower = leadsSearch.toLowerCase().trim();
-    if (!searchLower) return true;
-    const nombreMatch = (lead.nombre || '').toLowerCase().includes(searchLower);
-    const phoneMatch = (lead.phone || '').includes(searchLower);
-    const sistemaMatch = (lead.sistemaEstimado || '').toLowerCase().includes(searchLower);
-    return nombreMatch || phoneMatch || sistemaMatch;
-  });
-
-  // Helper to parse currency/cost strings
-  const parseCost = (costStr: string): number => {
-    if (!costStr) return 0;
-    const cleanStr = costStr.replace(/[^0-9.]/g, '');
-    const parsed = parseFloat(cleanStr);
-    return isNaN(parsed) ? 0 : parsed;
-  };
-
-  // Helper to format currency values
-  const formatCurrency = (val: number): string => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(val);
-  };
-
-  // Export leads to CSV file
-  
 
   return (
     <div className="flex h-full overflow-hidden">
