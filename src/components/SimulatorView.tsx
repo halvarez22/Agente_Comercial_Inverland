@@ -1,9 +1,11 @@
 import React from 'react';
 import { Send, RefreshCw, Zap, Play, Check, Copy, Sparkles, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Chat } from '../types';
 
 interface SimulatorViewProps {
   isDarkMode: boolean;
+  chats: Chat[];
   simPhone: string;
   setSimPhone: (val: string) => void;
   simName: string;
@@ -22,6 +24,7 @@ interface SimulatorViewProps {
 
 export const SimulatorView: React.FC<SimulatorViewProps> = ({
   isDarkMode,
+  chats,
   simPhone,
   setSimPhone,
   simName,

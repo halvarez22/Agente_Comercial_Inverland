@@ -238,6 +238,7 @@ export default function App() {
           {activeTab === 'simulator' && (
             <SimulatorView
               isDarkMode={isDarkMode}
+              chats={chats}
               simPhone={simPhone}
               setSimPhone={setSimPhone}
               simName={simName}
