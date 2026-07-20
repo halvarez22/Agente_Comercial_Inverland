@@ -1,6 +1,6 @@
 {
-  "name": "O3 Energy Sales Automation",
-  "description": "Sistema completo de automatización de ventas para O3 Energy México con monitor de chats, pre-cotización de paneles solares mediante IA y dashboard interactivo en tiempo real.",
+  "name": "InverLand Sales Automation",
+  "description": "Sistema de automatización de ventas inmobiliarias para Inverland Real Estate con Sofía: monitor de chats, matching de propiedades activas en Firestore y dashboard de leads calificados en tiempo real.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

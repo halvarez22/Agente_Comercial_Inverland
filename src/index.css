@@ -5,44 +5,83 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Overriding 'slate' to be pure black/white scale */
-  --color-slate-50: #ffffff;
-  --color-slate-100: #f5f5f5;
-  --color-slate-200: #e5e5e5;
-  --color-slate-300: #d4d4d4;
-  --color-slate-400: #a3a3a3;
-  --color-slate-500: #737373;
-  --color-slate-550: #666666;
-  --color-slate-600: #525252;
-  --color-slate-650: #4d4d4d;
-  --color-slate-700: #404040;
-  --color-slate-800: #262626;
-  --color-slate-850: #1a1a1a;
-  --color-slate-900: #141414;
-  --color-slate-950: #0f0f0f;
+  /* ── Paleta Oficial Inverland (Brand Manual) ── */
+  --color-inverland-blue: #0c3c5b;
+  --color-inverland-light-blue: #9fb0c2;
+  --color-inverland-aqua: #6acfec;
+  --color-inverland-off-white: #f3f2f2;
+  --color-inverland-black: #000000;
+  --color-inverland-primary: #0c3c5b;
+  --color-inverland-secondary: #9fb0c2;
+  --color-inverland-accent: #6acfec;
+
+  /*
+   * Remap de "orange" → acento corporativo InverLand
+   * Así toda la UI existente (botones, badges, focus) hereda la marca
+   * sin tocar cada clase una por una.
+   *   50–300  = fondos suaves / borders
+   *   400–500 = acento aqua (iconos, highlights)
+   *   600–950 = azul primario (CTAs, estados activos)
+   */
+  --color-orange-50: #eef6fa;
+  --color-orange-100: #d9ebf4;
+  --color-orange-200: #b8d5e6;
+  --color-orange-300: #9fb0c2;
+  --color-orange-400: #6acfec;
+  --color-orange-450: #5bc4e3;
+  --color-orange-500: #4db8db;
+  --color-orange-550: #3aa0c4;
+  --color-orange-600: #0c3c5b;
+  --color-orange-700: #0a3049;
+  --color-orange-800: #082538;
+  --color-orange-850: #061c2b;
+  --color-orange-900: #051a28;
+  --color-orange-950: #031018;
+
+  /* Neutrales alineados a off-white / navy (no gris cálido genérico) */
+  --color-slate-50: #f3f2f2;
+  --color-slate-100: #ebeaea;
+  --color-slate-200: #d7d6d6;
+  --color-slate-250: #c8cdd3;
+  --color-slate-300: #b0b8c2;
+  --color-slate-400: #8a96a3;
+  --color-slate-500: #6b7785;
+  --color-slate-550: #5a6673;
+  --color-slate-600: #4a5561;
+  --color-slate-650: #3d4752;
+  --color-slate-700: #2f3842;
+  --color-slate-800: #1c2833;
+  --color-slate-850: #15202a;
+  --color-slate-900: #0f1a24;
+  --color-slate-950: #0a1219;
+
+  /* Teal → aqua corporativo (SimulatorView y badges) */
+  --color-teal-400: #6acfec;
+  --color-teal-500: #4db8db;
+  --color-teal-600: #0c3c5b;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #0f0f0f;
-  color: #ffffff;
+  background-color: #0a1219;
+  color: #f3f2f2;
 }
 
-/* Custom scrollbar styling for a premium dark aesthetic */
+/* Custom scrollbar — acento InverLand */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(12, 60, 91, 0.25);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #404040; /* slate-700 */
+  background: #9fb0c2;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #525252; /* slate-600 */
+  background: #6acfec;
 }

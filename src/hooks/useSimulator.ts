@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 
 interface UseSimulatorProps {
   showToast: (msg: string) => void;
@@ -7,13 +7,13 @@ interface UseSimulatorProps {
 export function useSimulator({ showToast }: UseSimulatorProps) {
   const [simPhone, setSimPhone] = useState('5215544332211');
   const [simName, setSimName] = useState('Alejandro Ruiz');
-  const [simMessage, setSimMessage] = useState('Hola, buenas tardes, me interesa cotizar paneles para mi casa.');
+  const [simMessage, setSimMessage] = useState('Hola, buenas tardes, busco una casa en venta en León.');
   const [simPayload, setSimPayload] = useState<string>('');
   const [simResponse, setSimResponse] = useState<any>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationLog, setSimulationLog] = useState<string[]>([]);
 
-  const handleSimulateWebhook = async (e: React.FormEvent) => {
+  const handleSimulateWebhook = async (e: FormEvent) => {
     e.preventDefault();
     if (!simPhone.trim() || !simMessage.trim()) return;
 
@@ -42,26 +42,26 @@ export function useSimulator({ showToast }: UseSimulatorProps) {
         const data = await response.json();
         setSimResponse(data);
         
-        const replyLog = `[${new Date().toLocaleTimeString()}] Respuesta recibida de Gemini AI: "${data.reply}"`;
+        const replyLog = `[${new Date().toLocaleTimeString()}] Respuesta de Sofía (InverLand): "${data.reply}"`;
         const leadLog = data.lead_generated 
-          ? `[🔥 LEAD CALIFICADO] ¡Se detectó y registró un nuevo prospecto de paneles solares!`
-          : `[💬 Conversación en curso] El bot sigue recopilando información.`;
+          ? `[LEAD CALIFICADO] Se registró un prospecto inmobiliario y se sincronizó con el CRM.`
+          : `[Conversación] Sofía sigue calificando / buscando en stock activo.`;
           
         setSimulationLog(prev => {
           const logs = [leadLog, replyLog];
           if (data.email_sent) {
-            logs.unshift(`[📧 EMAIL ENVIADO] ¡Notificación por correo enviada con éxito al equipo de ventas (ventas@o3energy.mx)!`);
+            logs.unshift(`[EMAIL] Notificación enviada a gerencia (hola@inverland.mx).`);
           }
           return [...logs, ...prev];
         });
-        showToast(data.lead_generated ? '🔥 ¡Nuevo Lead Calificado Detectado!' : 'Mensaje procesado con éxito');
+        showToast(data.lead_generated ? 'Nuevo Lead Calificado Detectado' : 'Mensaje procesado con éxito');
       } else {
         const errorData = await response.text();
-        setSimulationLog(prev => [`[❌ ERROR] Falló el webhook: ${errorData}`, ...prev]);
+        setSimulationLog(prev => [`[ERROR] Falló el webhook: ${errorData}`, ...prev]);
         showToast('Error en la simulación del Webhook');
       }
     } catch (err: any) {
-      setSimulationLog(prev => [`[❌ ERROR RECHAZADO] No se pudo conectar: ${err.message}`, ...prev]);
+      setSimulationLog(prev => [`[ERROR] No se pudo conectar: ${err.message}`, ...prev]);
       showToast('Error de red en la simulación');
     } finally {
       setIsSimulating(false);
@@ -79,7 +79,7 @@ export function useSimulator({ showToast }: UseSimulatorProps) {
           setSelectedChatPhone(null);
           setSimulationLog([]);
           setSimResponse(null);
-          showToast('🧹 Base de datos del Playground restablecida con éxito.');
+          showToast('Base de datos del Playground restablecida con éxito.');
         }
       } catch (err) {
         showToast('Error de red al restablecer base de datos.');

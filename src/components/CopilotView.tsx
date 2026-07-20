@@ -6,10 +6,11 @@ import { Message } from '../types';
 interface CopilotViewProps {
   isDarkMode: boolean;
   copilotMessages: Message[];
+  setCopilotMessages: React.Dispatch<React.SetStateAction<{ sender: 'user' | 'bot'; text: string; timestamp: string }[]>>;
   copilotInput: string;
   setCopilotInput: (val: string) => void;
   isCopilotTyping: boolean;
-  handleSendCopilotQuery: (e: React.FormEvent) => void;
+  handleSendCopilotQuery: (queryText?: string) => void;
   copilotEndRef: React.RefObject<HTMLDivElement | null>;
   chats: any[];
   leads: any[];
@@ -18,6 +19,7 @@ interface CopilotViewProps {
 export const CopilotView: React.FC<CopilotViewProps> = ({
   isDarkMode,
   copilotMessages,
+  setCopilotMessages,
   copilotInput,
   setCopilotInput,
   isCopilotTyping,
@@ -185,7 +187,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                       isDarkMode ? 'text-white' : 'text-slate-900'
                     }`}>
                       <Database className="h-5 w-5 mr-2.5 text-orange-500 animate-pulse" />
-                      Asistente de Base de Datos O3 Copilot
+                      Asistente de Base de Datos InverLand Copilot
                     </h2>
                     <p className={`text-xs mt-1 transition-colors duration-250 ${
                       isDarkMode ? 'text-slate-400' : 'text-slate-500'
@@ -209,7 +211,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                         setCopilotMessages([
                           {
                             sender: 'bot',
-                            text: 'Conversaci├│n reiniciada. ┬┐En qu├® puedo ayudarte a buscar hoy?',
+                            text: 'Conversación reiniciada. ¿En qué puedo ayudarte a buscar hoy?',
                             timestamp: new Date().toISOString()
                           }
                         ]);
@@ -247,7 +249,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({
                       {/* Message header */}
                       <div className="flex items-center space-x-1.5 mb-1.5 border-b border-orange-500/10 pb-1">
                         <span className="text-[10px] font-bold text-orange-500 tracking-wider uppercase">
-                          {msg.sender === 'user' ? 'T├║ (Ventas)' : 'Copiloto O3'}
+                          {msg.sender === 'user' ? 'Tú (Ventas)' : 'Copiloto InverLand'}
                         </span>
                         <span className={`text-[9px] ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                           ÔÇó {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

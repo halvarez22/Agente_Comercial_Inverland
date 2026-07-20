@@ -43,12 +43,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isDarkMode ? 'bg-slate-900 border-slate-800/80 text-slate-250' : 'bg-white border-slate-200 text-slate-700'
       }`}>
         {/* Header / Logo */}
-        <div className={`p-6 border-b transition-colors duration-200 flex justify-between items-center ${isDarkMode ? 'border-slate-800/80' : 'border-slate-200'}`}>
-          <div className="flex-shrink-0 bg-white/5 p-3 rounded-xl border border-white/5 shadow-sm w-full flex justify-center items-center relative">
-            <img src="/images/logo-o3.png" alt="O3 Energy Logo" className="h-16 w-auto object-contain" />
+        <div className={`p-5 border-b transition-colors duration-200 flex justify-between items-center ${isDarkMode ? 'border-slate-800/80' : 'border-slate-200'}`}>
+          <div className="flex-shrink-0 bg-black p-3 rounded-xl border border-inverland-blue/30 shadow-sm w-full flex justify-center items-center relative overflow-hidden">
+            <img
+              src="/images/logo-inverland.png"
+              alt="Inverland Soluciones Inmobiliarias"
+              className="h-20 w-auto max-w-full object-contain"
+            />
             <button 
               onClick={() => setIsMobileMenuOpen(false)}
-              className="absolute right-2 top-2 p-1.5 rounded-lg md:hidden hover:bg-slate-800 hover:text-white text-slate-400 transition-colors"
+              className="absolute right-2 top-2 p-1.5 rounded-lg md:hidden hover:bg-white/10 hover:text-white text-slate-400 transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -102,7 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             {leads.filter(l => l.status === 'pending_review').length > 0 && (
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse ${
-                activeTab === 'leads' ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30' : 'bg-orange-600 text-white'
+                activeTab === 'leads' ? 'bg-inverland-aqua/20 text-inverland-aqua border border-inverland-aqua/30' : 'bg-orange-600 text-white'
               }`}>
                 {leads.filter(l => l.status === 'pending_review').length}
               </span>
@@ -173,7 +177,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-550">Gemini Engine:</span>
+            <span className="text-slate-550">Sofía Engine:</span>
             <span className={`font-medium flex items-center ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
               <Server className="h-3 w-3 mr-1" />
               gemini-2.0-flash

@@ -18,14 +18,15 @@ import { initRepositories } from '../server/infrastructure/web/container.js';
 
 // Firebase client config — these are public values (same as firebase-applet-config.json)
 // Hardcoded here to avoid runtime file-read issues in Vercel serverless environment
+// Prefer env overrides so Vercel can point Admin SDK at inverland-portal
 const firebaseConfig = {
-  projectId: 'agente-comercial-solar',
-  appId: '1:615897776902:web:1db49554bc7c0699755487',
-  apiKey: 'AIzaSyCMJtiqXdtrt7U-u4M0-PHljFCBQKJwp9g',
-  authDomain: 'agente-comercial-solar.firebaseapp.com',
-  firestoreDatabaseId: '(default)',
-  storageBucket: 'agente-comercial-solar.firebasestorage.app',
-  messagingSenderId: '615897776902',
+  projectId: process.env.FIREBASE_PROJECT_ID || 'inverland-portal',
+  appId: process.env.FIREBASE_APP_ID || '',
+  apiKey: process.env.FIREBASE_API_KEY || '',
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || 'inverland-portal.firebaseapp.com',
+  firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || '(default)',
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'inverland-portal.appspot.com',
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
 };
 
 const app = express();
@@ -96,7 +97,7 @@ async function getChatDoc(phone: string): Promise<any> {
     }
     return inMemoryChats[phone];
   }
-  const docRef = db.collection('tenants/o3energy_mexico/chats').doc(phone);
+  const docRef = db.collection('tenants/inverland/chats').doc(phone);
   const doc = await docRef.get();
   if (!doc.exists) {
     const newChat = { phone, nombre: 'Cliente', botDisabled: false, messages: [], lastMessageAt: new Date().toISOString() };
@@ -108,7 +109,7 @@ async function getChatDoc(phone: string): Promise<any> {
 
 async function updateChatDoc(phone: string, data: any): Promise<void> {
   if (isInMemory) { inMemoryChats[phone] = { ...inMemoryChats[phone], ...data }; return; }
-  await db.collection('tenants/o3energy_mexico/chats').doc(phone).set(data, { merge: true });
+  await db.collection('tenants/inverland/chats').doc(phone).set(data, { merge: true });
 }
 
 async function createQualifiedLead(lead: any): Promise<void> {
@@ -116,15 +117,15 @@ async function createQualifiedLead(lead: any): Promise<void> {
   if (isInMemory) {
     inMemoryLeads[leadId] = { ...lead, id: leadId, status: 'pending_review', createdAt: new Date().toISOString() };
   } else {
-    await db.collection('tenants/o3energy_mexico/qualified_leads').doc(leadId).set({ ...lead, status: 'pending_review', createdAt: new Date().toISOString() });
+    await db.collection('tenants/inverland/qualified_leads').doc(leadId).set({ ...lead, status: 'pending_review', createdAt: new Date().toISOString() });
   }
 }
 
 // --- EMAIL NOTIFICATION ---
 async function sendSalesEmailNotification(lead: any, phone: string): Promise<boolean> {
-  const senderEmail = process.env.SENDER_EMAIL || 'alertas@o3energy.mx';
+  const senderEmail = process.env.SENDER_EMAIL || 'hola@inverland.mx';
   const senderPassword = process.env.SENDER_PASSWORD;
-  const salesEmail = process.env.SALES_EMAIL || 'ventas@o3energy.mx';
+  const salesEmail = process.env.SALES_EMAIL || 'hola@inverland.mx';
   const smtpServer = process.env.SMTP_SERVER || 'smtp.gmail.com';
   const smtpPort = parseInt(process.env.SMTP_PORT || '587');
 
@@ -133,7 +134,7 @@ async function sendSalesEmailNotification(lead: any, phone: string): Promise<boo
     <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; margin: 0 auto;">
       <div style="background-color: #ea580c; color: white; padding: 24px; text-align: center;">
         <h1 style="margin: 0; font-size: 20px;">🔥 ¡Nuevo Lead Calificado!</h1>
-        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">O3 Energy Sales Automation AI</p>
+        <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">InverLand Sales Automation AI</p>
       </div>
       <div style="padding: 24px; color: #334155;">
         <table style="width: 100%; border-collapse: collapse;">
@@ -156,7 +157,7 @@ async function sendSalesEmailNotification(lead: any, phone: string): Promise<boo
   }
   try {
     const transporter = nodemailer.createTransport({ host: smtpServer, port: smtpPort, secure: smtpPort === 465, auth: { user: senderEmail, pass: senderPassword } });
-    await transporter.sendMail({ from: `"Alertas O3 Energy AI" <${senderEmail}>`, to: salesEmail, subject, html: bodyHtml });
+    await transporter.sendMail({ from: `"Alertas InverLand AI" <${senderEmail}>`, to: salesEmail, subject, html: bodyHtml });
     return true;
   } catch (err) {
     console.error('[SMTP ERROR]', err);
@@ -275,8 +276,8 @@ app.use(['/whatsapp-webhook', '/api/whatsapp-webhook'], (req, res, next) => {
 app.get('/api/chats', async (_req, res) => {
   try {
     if (isInMemory) return res.json(Object.values(inMemoryChats));
-    // V2 uses tenants/o3energy_mexico/chats
-    const snapshot = await db.collection('tenants/o3energy_mexico/chats').orderBy('lastMessageAt', 'desc').get();
+    // V2 uses tenants/inverland/chats
+    const snapshot = await db.collection('tenants/inverland/chats').orderBy('lastMessageAt', 'desc').get();
     return res.json(snapshot.docs.map((doc: any) => {
       const data = doc.data();
       // Map V2 camelCase back to V1 snake_case for the frontend
@@ -325,8 +326,8 @@ app.post('/api/chats/:phone/message', async (req, res) => {
 app.get('/api/leads', async (_req, res) => {
   try {
     if (isInMemory) return res.json(Object.values(inMemoryLeads));
-    // V2 uses tenants/o3energy_mexico/qualified_leads
-    const snapshot = await db.collection('tenants/o3energy_mexico/qualified_leads').orderBy('createdAt', 'desc').get();
+    // V2 uses tenants/inverland/qualified_leads
+    const snapshot = await db.collection('tenants/inverland/qualified_leads').orderBy('createdAt', 'desc').get();
     return res.json(snapshot.docs.map((doc: any) => {
       const data = doc.data();
       return {
@@ -352,13 +353,13 @@ app.post('/api/copilot/query', async (req, res) => {
       leadsList = Object.values(inMemoryLeads);
       chatsList = Object.values(inMemoryChats).map((c: any) => ({ id: c.id, phone: c.phone, nombre: c.nombre, botDisabled: c.botDisabled, montoRecibo: c.montoRecibo, sistemaEstimado: c.sistemaEstimado, costoEstimado: c.costoEstimado, message_count: c.messages?.length || 0, lastMessageAt: c.lastMessageAt }));
     } else {
-      const ls = await db.collection('tenants/o3energy_mexico/qualified_leads').orderBy('createdAt', 'desc').get();
+      const ls = await db.collection('tenants/inverland/qualified_leads').orderBy('createdAt', 'desc').get();
       leadsList = ls.docs.map((d: any) => ({ id: d.id, ...d.data() }));
-      const cs = await db.collection('tenants/o3energy_mexico/chats').orderBy('lastMessageAt', 'desc').get();
+      const cs = await db.collection('tenants/inverland/chats').orderBy('lastMessageAt', 'desc').get();
       chatsList = cs.docs.map((d: any) => { const data = d.data(); return { id: d.id, phone: data.phone, nombre: data.nombre, botDisabled: data.botDisabled, montoRecibo: data.montoRecibo, sistemaEstimado: data.sistemaEstimado, costoEstimado: data.costoEstimado, message_count: data.messages?.length || 0, lastMessageAt: data.lastMessageAt }; });
     }
     const databaseContext = { qualified_leads: leadsList, chats_metadata: chatsList, current_time: new Date().toISOString(), metadata: { total_leads: leadsList.length, total_chats: chatsList.length, pending_leads: leadsList.filter((l: any) => l.status === 'pending_review').length, contacted_leads: leadsList.filter((l: any) => l.status === 'contacted').length } };
-    const systemInstruction = `Eres el Copiloto Inteligente de Base de Datos de Ventas de "O3 Energy México". Responde con precisión analítica usando ÚNICAMENTE los datos:\n${JSON.stringify(databaseContext, null, 2)}\nUsa formato Markdown con tablas y negritas. Montos en pesos mexicanos. Si está vacío, sugiere usar el Simulador de Webhook.`;
+    const systemInstruction = `Eres el Copiloto de Ventas de Inverland Real Estate. Analiza leads inmobiliarios y chats usando ÚNICAMENTE estos datos:\n${JSON.stringify(databaseContext, null, 2)}\nUsa Markdown. Montos en MXN. No inventes inventario.`;
     try {
       const chatHistory = [
         ...(history || []).map((m: any) => ({
@@ -381,7 +382,7 @@ app.post('/api/leads/:id/contacted', async (req, res) => {
   const { id } = req.params;
   try {
     if (isInMemory) { if (inMemoryLeads[id]) inMemoryLeads[id].status = 'contacted'; return res.json({ success: true }); }
-    await db.collection('tenants/o3energy_mexico/qualified_leads').doc(id).update({ status: 'contacted' });
+    await db.collection('tenants/inverland/qualified_leads').doc(id).update({ status: 'contacted' });
     return res.json({ success: true });
   } catch (err: any) { return res.status(500).json({ error: err.message }); }
 });
@@ -392,7 +393,7 @@ app.post('/api/leads/:id/notes', async (req, res) => {
   const { privateNotes } = req.body;
   try {
     if (isInMemory) { if (inMemoryLeads[id]) inMemoryLeads[id].privateNotes = privateNotes; return res.json({ success: true, privateNotes }); }
-    await db.collection('tenants/o3energy_mexico/qualified_leads').doc(id).set({ privateNotes }, { merge: true });
+    await db.collection('tenants/inverland/qualified_leads').doc(id).set({ privateNotes }, { merge: true });
     return res.json({ success: true, privateNotes });
   } catch (err: any) { return res.status(500).json({ error: err.message }); }
 });
@@ -404,9 +405,9 @@ app.post('/api/reset-demo', async (_req, res) => {
       Object.keys(inMemoryChats).forEach(k => delete inMemoryChats[k]);
       Object.keys(inMemoryLeads).forEach(k => delete inMemoryLeads[k]);
     } else {
-      const chatsSnap = await db.collection('tenants/o3energy_mexico/chats').get();
+      const chatsSnap = await db.collection('tenants/inverland/chats').get();
       for (const doc of chatsSnap.docs) await doc.ref.delete();
-      const leadsSnap = await db.collection('tenants/o3energy_mexico/qualified_leads').get();
+      const leadsSnap = await db.collection('tenants/inverland/qualified_leads').get();
       for (const doc of leadsSnap.docs) await doc.ref.delete();
     }
     return res.json({ success: true, message: 'Datos reseteados.' });

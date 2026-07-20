@@ -13,6 +13,7 @@ import nodemailer from 'nodemailer';
 import fs from 'fs';
 import firebaseConfig from './firebase-applet-config.json';
 import { buildReceiveMessageUseCase, initRepositories } from './server/infrastructure/web/container.js';
+import { AppConfig } from './server/shared/config/AppConfig.js';
 
 dotenv.config();
 
@@ -127,9 +128,9 @@ async function createQualifiedLead(lead: any): Promise<void> {
 }
 
 async function sendSalesEmailNotification(lead: any, phone: string): Promise<boolean> {
-  const senderEmail = process.env.SENDER_EMAIL || 'alertas@o3energy.mx';
+  const senderEmail = process.env.SENDER_EMAIL || AppConfig.smtp.user;
   const senderPassword = process.env.SENDER_PASSWORD;
-  const salesEmail = process.env.SALES_EMAIL || 'ventas@o3energy.mx';
+  const salesEmail = process.env.SALES_EMAIL || AppConfig.smtp.salesEmail;
   const smtpServer = process.env.SMTP_SERVER || 'smtp.gmail.com';
   const smtpPort = parseInt(process.env.SMTP_PORT || '587');
 
@@ -471,7 +472,7 @@ app.get(['/whatsapp-webhook', '/api/whatsapp-webhook'], (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'O3_ENERGY_MEXICO_TOKEN';
+  const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || AppConfig.meta.verifyToken;
 
   if (mode && token) {
     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
@@ -539,7 +540,7 @@ app.post(['/whatsapp-webhook', '/api/whatsapp-webhook'], async (req, res) => {
 
     // ── Delegate to the clean-architecture use case (Tool Calling enabled) ──
     const useCase = buildReceiveMessageUseCase();
-    const result = await useCase.execute({ phone, text, name, tenantId: 'o3energy_mexico' });
+    const result = await useCase.execute({ phone, text, name, tenantId: AppConfig.tenant.defaultId });
 
     // Read back the saved conversation to mirror into the legacy flat-chat store for the UI
     const savedChat = await getChatDoc(phone);

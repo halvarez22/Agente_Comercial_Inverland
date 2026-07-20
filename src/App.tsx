@@ -105,7 +105,7 @@ export default function App() {
               <span className={isDarkMode ? 'text-slate-650' : 'text-slate-300'}>|</span>
               <span className="font-semibold text-emerald-500 flex items-center">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse mr-1.5" />
-                Sistema en Línea (Gemini)
+                Sistema en Línea (Sofía)
               </span>
             </div>
           </div>
@@ -221,6 +221,7 @@ export default function App() {
               handleMarkContacted={handleMarkContacted}
               copiedText={copiedText}
               setCopiedText={setCopiedText}
+              setActiveTab={setActiveTab}
             />
           )}
 
@@ -239,6 +240,7 @@ export default function App() {
               simResponse={simResponse}
               isSimulating={isSimulating}
               simulationLog={simulationLog}
+              setSimulationLog={setSimulationLog}
               handleSimulateWebhook={handleSimulateWebhook}
               copiedText={copiedText}
               setCopiedText={setCopiedText}
@@ -249,6 +251,7 @@ export default function App() {
             <CopilotView
               isDarkMode={isDarkMode}
               copilotMessages={copilotMessages}
+              setCopilotMessages={setCopilotMessages}
               copilotInput={copilotInput}
               setCopilotInput={setCopilotInput}
               isCopilotTyping={isCopilotTyping}

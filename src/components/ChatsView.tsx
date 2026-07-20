@@ -263,12 +263,12 @@ export const ChatsView: React.FC<ChatsViewProps> = ({
                       }`}>
                         <div className="flex items-center space-x-5">
                           <div>
-                            <span className="text-slate-500 block font-semibold uppercase text-[9px] tracking-wide">Gasto Promedio CFE</span>
+                            <span className="text-slate-500 block font-semibold uppercase text-[9px] tracking-wide">Presupuesto</span>
                             <span className={`font-bold text-sm ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{selectedChat.montoRecibo}</span>
                           </div>
                           <div className={`border-l h-8 ${isDarkMode ? 'border-slate-800/80' : 'border-slate-200'}`}></div>
                           <div>
-                            <span className="text-slate-500 block font-semibold uppercase text-[9px] tracking-wide">Sistema Propuesto</span>
+                            <span className="text-slate-500 block font-semibold uppercase text-[9px] tracking-wide">Propiedad / Interés</span>
                             <span className={`font-bold text-sm flex items-center ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
                               <Layers className="h-3.5 w-3.5 text-orange-500 mr-1" />
                               {selectedChat.sistemaEstimado}
@@ -276,7 +276,7 @@ export const ChatsView: React.FC<ChatsViewProps> = ({
                           </div>
                           <div className={`border-l h-8 ${isDarkMode ? 'border-slate-800/80' : 'border-slate-200'}`}></div>
                           <div>
-                            <span className="text-slate-500 block font-semibold uppercase text-[9px] tracking-wide font-sans">Presupuesto Estimado</span>
+                            <span className="text-slate-500 block font-semibold uppercase text-[9px] tracking-wide font-sans">Precio Referencia</span>
                             <span className="font-bold text-orange-500 text-sm">{selectedChat.costoEstimado}</span>
                           </div>
                         </div>
@@ -325,7 +325,7 @@ export const ChatsView: React.FC<ChatsViewProps> = ({
                                     : isDarkMode ? 'border-slate-800/40' : 'border-slate-100'
                                 }`}>
                                   <span className="text-[10px] font-bold tracking-wide uppercase opacity-75">
-                                    {isUser ? 'Cliente' : isAgent ? 'Asesor (T├║)' : 'Bot de IA (O3 Energy)'}
+                                    {isUser ? 'Cliente' : isAgent ? 'Asesor (Tú)' : 'Sofía (InverLand)'}
                                   </span>
                                   <span className="text-[9px] opacity-60 font-mono">
                                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

@@ -28,9 +28,9 @@ export function useNotifications() {
       setNotificationPermission(permission);
       if (permission === 'granted') {
         showToast('¡Notificaciones activadas con éxito!');
-        new Notification('O3 Energy Alertas', {
+        new Notification('InverLand Alertas', {
           body: 'Notificaciones activadas para nuevos leads calificados.',
-          icon: '/favicon.ico'
+          icon: '/images/logo-inverland.png'
         });
       } else if (permission === 'denied') {
         showToast('Notificaciones rechazadas por el usuario.');
@@ -42,10 +42,10 @@ export function useNotifications() {
 
   const triggerBrowserNotification = useCallback((lead: QualifiedLead, onNotificationClick: () => void) => {
     if ('Notification' in window && Notification.permission === 'granted') {
-      const title = `🔥 Lead Calificado: ${lead.nombre || 'Cliente Nuevo'}`;
+      const title = `Lead Calificado: ${lead.nombre || 'Cliente Nuevo'}`;
       const options = {
-        body: `Recibo: ${lead.montoRecibo || 'Sin monto'} | Sistema: ${lead.sistemaEstimado || 'Sin sistema'}`,
-        icon: '/favicon.ico',
+        body: `${lead.operationType || 'Interés'} | Presupuesto: ${lead.budget || lead.montoRecibo || '—'} | ${lead.sistemaEstimado || lead.matchedPropertyTitles || 'Sin propiedad'}`,
+        icon: '/images/logo-inverland.png',
         tag: lead.id,
         requireInteraction: true
       };

@@ -7,6 +7,7 @@ export type ConversationPhase =
   | 'QUALIFICATION'
   | 'TECHNICAL_SURVEY'
   | 'QUOTATION'
+  | 'SEARCH'
   | 'FINANCING'
   | 'CLOSING'
   | 'LEAD_GENERATED'
@@ -19,6 +20,13 @@ export interface ConversationState {
   leadScore: number;       // 0–100
   intent?: string;
   clientName?: string;
+  operationType?: string;
+  budgetMax?: number;
+  preferredZones?: string;
+  propertyType?: string;
+  bedrooms?: number;
+  matchedPropertyIds?: string[];
+  // Legacy solar fields (backward compat)
   monthlyBill?: number;
   isOwner?: boolean;
   roofType?: string;
@@ -43,8 +51,10 @@ export interface Conversation {
   state: ConversationState;
   lastMessageAt: string;
   createdAt: string;
-  // Legacy lead fields (kept for backward compat with Firestore)
-  montoRecibo?: string;
-  sistemaEstimado?: string;
+  // Display fields for dashboard
+  montoRecibo?: string;       // budget display
+  sistemaEstimado?: string;   // matched property / interest summary
   costoEstimado?: string;
+  operationType?: string;
+  preferredZones?: string;
 }

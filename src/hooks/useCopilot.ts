@@ -4,7 +4,7 @@ export function useCopilot() {
   const [copilotMessages, setCopilotMessages] = useState<{ sender: 'user' | 'bot'; text: string; timestamp: string }[]>([
     {
       sender: 'bot',
-      text: '¡Hola! Soy tu Copiloto Inteligente de Ventas de O3 Energy México. Pregúntame lo que quieras sobre los leads calificados, montos estimados de cotizaciones, proyecciones de ahorro o estadísticas generales de los chats.',
+      text: '¡Hola! Soy tu Copiloto de Ventas de Inverland Real Estate. Pregúntame sobre leads calificados, presupuestos, zonas de interés, tipos de operación o estadísticas de los chats.',
       timestamp: new Date().toISOString()
     }
   ]);
@@ -58,7 +58,7 @@ export function useCopilot() {
       console.error('Error in copilot request:', err);
       setCopilotMessages(prev => [...prev, {
         sender: 'bot' as const,
-        text: 'Lo siento, ocurrió un error al consultar la base de datos con la IA. Asegúrate de que el servidor esté activo y la API Key de Gemini esté configurada.',
+        text: 'Lo siento, ocurrió un error al consultar la base de datos con la IA. Verifica que el servidor esté activo y GROQ_API_KEY configurada.',
         timestamp: new Date().toISOString()
       }]);
     } finally {

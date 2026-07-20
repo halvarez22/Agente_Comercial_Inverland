@@ -17,6 +17,7 @@ interface SimulatorViewProps {
   simResponse: any;
   isSimulating: boolean;
   simulationLog: any[];
+  setSimulationLog: React.Dispatch<React.SetStateAction<string[]>>;
   handleSimulateWebhook: (e: React.FormEvent) => void;
   copiedText: string | null;
   setCopiedText: (val: string | null) => void;
@@ -36,6 +37,7 @@ export const SimulatorView: React.FC<SimulatorViewProps> = ({
   simResponse,
   isSimulating,
   simulationLog,
+  setSimulationLog,
   handleSimulateWebhook,
   copiedText,
   setCopiedText
@@ -55,7 +57,7 @@ export const SimulatorView: React.FC<SimulatorViewProps> = ({
                 <p className={`text-sm mt-1 font-light transition-colors duration-200 ${
                   isDarkMode ? 'text-slate-400' : 'text-slate-600'
                 }`}>
-                  Prueba la lógica conversacional del Bot de Gemini. Envía mensajes simulando ser un cliente y observa la extracción de parámetros y el historial de chat en tiempo real.
+                  Prueba la lógica conversacional de Sofía (InverLand). Envía mensajes simulando ser un cliente y observa el matching de propiedades y el historial en tiempo real.
                 </p>
               </div>
 
@@ -73,12 +75,12 @@ export const SimulatorView: React.FC<SimulatorViewProps> = ({
                   <div className={`p-4 pt-6 flex items-center space-x-3 shadow-sm border-b transition-colors duration-200 ${
                     isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'
                   }`}>
-                    <div className="h-8 w-8 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-500 font-bold">
-                      O3
+                    <div className="h-8 w-8 rounded-full overflow-hidden border border-inverland-aqua/30 bg-black flex items-center justify-center shrink-0">
+                      <img src="/images/logo-inverland.png" alt="InverLand" className="h-full w-full object-cover" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-xs leading-none">O3 Energy México</h4>
-                      <span className="text-[9px] text-orange-500 font-medium tracking-wide">Asistente Virtual de Ventas</span>
+                      <h4 className="font-bold text-xs leading-none">Inverland Real Estate</h4>
+                      <span className="text-[9px] text-inverland-aqua font-medium tracking-wide">Sofía — Asesora Virtual</span>
                     </div>
                   </div>
 
@@ -92,7 +94,7 @@ export const SimulatorView: React.FC<SimulatorViewProps> = ({
                           ? 'bg-slate-900 text-slate-500 border-slate-850' 
                           : 'bg-white text-slate-500 border-slate-200'
                       }`}>
-                        Mensajes procesados por Gemini AI para O3 Energy
+                        Mensajes procesados por Sofía con stock activo de InverLand
                       </span>
                     </div>
 

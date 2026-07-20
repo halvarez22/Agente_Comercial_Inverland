@@ -55,9 +55,11 @@ export function useLeadsManager({ showToast }: UseLeadsManagerProps) {
       'ID',
       'Nombre',
       'Teléfono',
-      'Monto Recibo',
-      'Sistema Estimado',
-      'Costo Estimado (MXN)',
+      'Operación',
+      'Presupuesto',
+      'Zonas',
+      'Propiedad / Interés',
+      'Precio Ref.',
       'Estado',
       'Fecha Creación',
       'Notas Privadas'
@@ -67,8 +69,10 @@ export function useLeadsManager({ showToast }: UseLeadsManagerProps) {
       lead.id,
       lead.nombre || '',
       lead.phone || '',
-      lead.montoRecibo || '',
-      lead.sistemaEstimado || '',
+      lead.operationType || '',
+      lead.budget || lead.montoRecibo || '',
+      lead.preferredZones || '',
+      lead.matchedPropertyTitles || lead.sistemaEstimado || '',
       lead.costoEstimado || '',
       lead.status === 'pending_review' ? 'Pendiente de Contacto' : 'Contactado',
       lead.createdAt ? new Date(lead.createdAt).toLocaleString('es-MX') : '',
@@ -90,7 +94,7 @@ export function useLeadsManager({ showToast }: UseLeadsManagerProps) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `O3_Energy_Leads_Calificados_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute('download', `InverLand_Leads_Calificados_${new Date().toISOString().slice(0, 10)}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();

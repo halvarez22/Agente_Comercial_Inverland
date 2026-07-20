@@ -74,7 +74,7 @@ export function useFirebase({ onNewLeadNotification }: UseFirebaseProps) {
         startPollingFallback();
       }, 3500);
 
-      const chatsQuery = query(collection(db, 'tenants/o3energy_mexico/chats'), orderBy('lastMessageAt', 'desc'));
+      const chatsQuery = query(collection(db, 'tenants/inverland/chats'), orderBy('lastMessageAt', 'desc'));
       unsubscribeChats = onSnapshot(chatsQuery, (snapshot) => {
         clearTimeout(connectionTimeout);
         const chatsList: Chat[] = [];
@@ -91,7 +91,7 @@ export function useFirebase({ onNewLeadNotification }: UseFirebaseProps) {
         startPollingFallback();
       });
 
-      const leadsQuery = query(collection(db, 'tenants/o3energy_mexico/qualified_leads'), orderBy('createdAt', 'desc'));
+      const leadsQuery = query(collection(db, 'tenants/inverland/qualified_leads'), orderBy('createdAt', 'desc'));
       unsubscribeLeads = onSnapshot(leadsQuery, (snapshot) => {
         const leadsList: QualifiedLead[] = [];
         snapshot.forEach((doc) => {

@@ -164,7 +164,7 @@ v2Router.post('/copilot/query', async (req: Request, res: Response) => {
       metadata: { total_leads: leads.length, total_chats: chats.length }
     };
     
-    const systemInstruction = `Eres el Copiloto de Ventas. Responde analizando: ${JSON.stringify(databaseContext)}. Usa Markdown y pesos MXN.`;
+    const systemInstruction = `Eres el Copiloto de Ventas de Inverland Real Estate. Analiza leads inmobiliarios (presupuesto, zonas, tipo de operación, propiedades de interés) y chats. Datos: ${JSON.stringify(databaseContext)}. Usa Markdown y pesos MXN. No inventes inventario.`;
     
     const chatHistory = [
       { role: 'system', content: systemInstruction },

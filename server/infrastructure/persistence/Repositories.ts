@@ -12,7 +12,7 @@ const leadsStore: Record<string, Lead> = {};
 const defaultState = (): ConversationState => ({
   phase: 'GREETING',
   completedSteps: [],
-  missingFields: ['name', 'isOwner', 'monthlyBill'],
+  missingFields: ['name', 'operationType', 'budget', 'zoneOrType'],
   leadScore: 0,
 });
 

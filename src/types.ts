@@ -14,9 +14,13 @@ export interface Chat {
   phone: string;
   nombre?: string;
   botDisabled: boolean;
+  /** Budget / presupuesto display */
   montoRecibo?: string;
+  /** Matched property or interest summary */
   sistemaEstimado?: string;
   costoEstimado?: string;
+  operationType?: string;
+  preferredZones?: string;
   lastMessageAt: string;
   messages: Message[];
 }
@@ -25,10 +29,20 @@ export interface QualifiedLead {
   id: string;
   nombre: string;
   phone: string;
+  operationType?: string;
+  budget?: string;
+  preferredZones?: string;
+  propertyType?: string;
+  matchedPropertyIds?: string[];
+  matchedPropertyTitles?: string;
+  /** Budget display (compat) */
   montoRecibo?: string;
+  /** Interest / property summary */
   sistemaEstimado?: string;
   costoEstimado?: string;
+  leadScore?: number;
   status: 'pending_review' | 'contacted';
   createdAt: string;
   privateNotes?: string;
+  notasTecnicas?: string;
 }

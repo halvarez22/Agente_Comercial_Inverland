@@ -1,29 +1,31 @@
 /**
  * Dependency Injection Container — wires all components together.
  * If Firebase credentials are present → uses Firestore repos.
- * Otherwise → falls back to InMemory repos.
+ * Otherwise → falls back to InMemory repos + demo properties.
  */
 import { GroqProvider } from '../llm/GroqProvider.js';
-import { SolarQuoteEngine } from '../engines/SolarQuoteEngine.js';
+import { PropertyMatchingEngine } from '../engines/PropertyMatchingEngine.js';
 import {
   FirestoreConversationRepository,
   FirestoreLeadRepository,
   InMemoryConversationRepository,
   InMemoryLeadRepository,
-} from '../persistence/Repositories';
+} from '../persistence/Repositories.js';
+import {
+  FirestorePropertyRepository,
+  InMemoryPropertyRepository,
+} from '../persistence/PropertyRepository.js';
 import { LLMOrchestrator } from '../../application/orchestrators/LLMOrchestrator.js';
 import { ReceiveMessageUseCase } from '../../application/usecases/ReceiveMessageUseCase.js';
+import { LeadSyncService } from '../../application/services/LeadSyncService.js';
 import { SOFIA_DEFINITION } from '../../agents/definitions/Sofia.js';
 import { AppConfig } from '../../shared/config/AppConfig.js';
 import { logger } from '../../shared/logger/ConsoleLogger.js';
 import { getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
-// ─── Infrastructure ────────────────────────────────────────────────────────
-const quoteEngine = new SolarQuoteEngine();
 const llmProvider = new GroqProvider();
 
-// ─── WhatsApp sender (stateless utility) ───────────────────────────────────
 async function sendWhatsAppMessage(phone: string, text: string): Promise<boolean> {
   const { accessToken, phoneNumberId } = AppConfig.meta;
   if (!accessToken || !phoneNumberId) {
@@ -39,7 +41,7 @@ async function sendWhatsAppMessage(phone: string, text: string): Promise<boolean
         recipient_type: 'individual',
         to: phone,
         type: 'text',
-        text: { preview_url: false, body: text },
+        text: { preview_url: true, body: text },
       }),
     });
     if (!res.ok) {
@@ -55,19 +57,24 @@ async function sendWhatsAppMessage(phone: string, text: string): Promise<boolean
   }
 }
 
-// ─── Repository selection (lazy — evaluated per-request) ─────────────────
-function getRepos() {
+function getFirestoreDb(): any | null {
   try {
     if (getApps().length > 0) {
-      const db = getFirestore();
-      logger.info('[DI] Using Firestore repositories (multi-tenant)');
-      return {
-        convRepo: new FirestoreConversationRepository(db),
-        leadRepo: new FirestoreLeadRepository(db),
-      };
+      return getFirestore();
     }
   } catch (e: any) {
-    logger.warn('[DI] Could not get Firestore, falling back to InMemory', { error: e.message });
+    logger.warn('[DI] Could not get Firestore', { error: e.message });
+  }
+  return null;
+}
+
+function getRepos(db: any | null) {
+  if (db) {
+    logger.info('[DI] Using Firestore repositories (multi-tenant)');
+    return {
+      convRepo: new FirestoreConversationRepository(db),
+      leadRepo: new FirestoreLeadRepository(db),
+    };
   }
   logger.warn('[DI] Firestore not available — using InMemory repositories');
   return {
@@ -76,11 +83,21 @@ function getRepos() {
   };
 }
 
-// Keep initRepositories for backward compat (used in local test scripts)
+function buildPropertyCatalog(db: any | null) {
+  if (db) {
+    const repo = new FirestorePropertyRepository(db);
+    return new PropertyMatchingEngine(() => repo.getActiveProperties());
+  }
+  const repo = new InMemoryPropertyRepository();
+  return new PropertyMatchingEngine(() => repo.getActiveProperties());
+}
+
 let _convRepo: FirestoreConversationRepository | InMemoryConversationRepository | undefined;
 let _leadRepo: FirestoreLeadRepository | InMemoryLeadRepository | undefined;
+let _db: any | null = null;
 
 export function initRepositories(db: any | null) {
+  _db = db;
   if (db) {
     logger.info('[DI] initRepositories: Using Firestore repositories (multi-tenant)');
     _convRepo = new FirestoreConversationRepository(db);
@@ -92,14 +109,23 @@ export function initRepositories(db: any | null) {
   }
 }
 
-// ─── Use Case Factory ─────────────────────────────────────────────────────
 export function buildReceiveMessageUseCase(): ReceiveMessageUseCase {
-  // Use pre-initialized repos if available (local test), otherwise lazy-load
-  const repos = (_convRepo && _leadRepo)
-    ? { convRepo: _convRepo, leadRepo: _leadRepo }
-    : getRepos();
-  const orchestrator = new LLMOrchestrator(llmProvider, quoteEngine, repos.leadRepo, repos.convRepo);
+  const db = _db ?? getFirestoreDb();
+  const repos =
+    _convRepo && _leadRepo
+      ? { convRepo: _convRepo, leadRepo: _leadRepo }
+      : getRepos(db);
+
+  const propertyCatalog = buildPropertyCatalog(db);
+  const leadSync = new LeadSyncService(db, (lead) => repos.leadRepo.save(lead), sendWhatsAppMessage);
+  const orchestrator = new LLMOrchestrator(
+    llmProvider,
+    propertyCatalog,
+    repos.leadRepo,
+    repos.convRepo,
+    leadSync,
+  );
   return new ReceiveMessageUseCase(repos.convRepo, orchestrator, SOFIA_DEFINITION, sendWhatsAppMessage);
 }
 
-export { _convRepo as convRepo, _leadRepo as leadRepo };
+export { _convRepo as convRepo, _leadRepo as leadRepo, sendWhatsAppMessage };

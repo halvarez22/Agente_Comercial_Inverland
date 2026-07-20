@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, TrendingUp, Clock, CheckCircle, DollarSign, Sparkles, Zap, Search, Download, Copy, Check, Phone } from 'lucide-react';
+import { Users, TrendingUp, Clock, CheckCircle, DollarSign, Sparkles, Zap, Search, Download, Copy, Check, Phone, RefreshCw, UserCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { QualifiedLead } from '../types';
@@ -17,6 +17,7 @@ interface LeadsViewProps {
   handleMarkContacted: (leadId: string) => void;
   copiedText: string | null;
   setCopiedText: (val: string | null) => void;
+  setActiveTab?: (tab: 'chats' | 'leads' | 'simulator' | 'guide' | 'copilot') => void;
 }
 
 export const LeadsView: React.FC<LeadsViewProps> = ({
@@ -31,33 +32,29 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
   handleSaveNotes,
   handleMarkContacted,
   copiedText,
-  setCopiedText
+  setCopiedText,
+  setActiveTab
 }) => {
 
   const systemData = React.useMemo(() => {
     const counts: Record<string, number> = {};
     leads.forEach(lead => {
-      let sys = lead.sistemaEstimado || 'No especificado';
+      let sys = lead.operationType || lead.propertyType || lead.sistemaEstimado || 'Sin clasificar';
       if (sys.length > 30) {
-        const match = sys.match(/\d+\s+paneles/i);
-        if (match) {
-          sys = match[0];
-        } else {
-          sys = sys.substring(0, 27) + '...';
-        }
+        sys = sys.substring(0, 27) + '...';
       }
       counts[sys] = (counts[sys] || 0) + 1;
     });
 
     const colors = [
-      '#10b981',
-      '#06b6d4',
-      '#3b82f6',
-      '#f59e0b',
-      '#8b5cf6',
-      '#ec4899',
-      '#14b8a6',
-      '#6366f1',
+      '#0c3c5b',
+      '#6acfec',
+      '#9fb0c2',
+      '#4db8db',
+      '#082538',
+      '#3aa0c4',
+      '#b8d5e6',
+      '#051a28',
     ];
 
     return Object.entries(counts).map(([name, value], index) => ({
@@ -73,7 +70,9 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
     const nombreMatch = (lead.nombre || '').toLowerCase().includes(searchLower);
     const phoneMatch = (lead.phone || '').includes(searchLower);
     const sistemaMatch = (lead.sistemaEstimado || '').toLowerCase().includes(searchLower);
-    return nombreMatch || phoneMatch || sistemaMatch;
+    const zoneMatch = (lead.preferredZones || '').toLowerCase().includes(searchLower);
+    const opMatch = (lead.operationType || '').toLowerCase().includes(searchLower);
+    return nombreMatch || phoneMatch || sistemaMatch || zoneMatch || opMatch;
   });
 
   const parseCost = (costStr: string): number => {
@@ -103,9 +102,11 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
       'ID',
       'Nombre',
       'Teléfono',
-      'Monto Recibo',
-      'Sistema Estimado',
-      'Costo Estimado (MXN)',
+      'Operación',
+      'Presupuesto',
+      'Zonas',
+      'Propiedad / Interés',
+      'Precio Ref.',
       'Estado',
       'Fecha Creación',
       'Notas Privadas'
@@ -116,8 +117,10 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
       lead.id,
       lead.nombre || '',
       lead.phone || '',
-      lead.montoRecibo || '',
-      lead.sistemaEstimado || '',
+      lead.operationType || '',
+      lead.budget || lead.montoRecibo || '',
+      lead.preferredZones || '',
+      lead.matchedPropertyTitles || lead.sistemaEstimado || '',
       lead.costoEstimado || '',
       lead.status === 'pending_review' ? 'Pendiente de Contacto' : 'Contactado',
       lead.createdAt ? new Date(lead.createdAt).toLocaleString('es-MX') : '',
@@ -141,7 +144,7 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `O3_Energy_Leads_Calificados_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.setAttribute('download', `InverLand_Leads_Calificados_${new Date().toISOString().slice(0, 10)}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -173,12 +176,12 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                     isDarkMode ? 'text-white' : 'text-slate-900'
                   }`}>
                     <Users className="h-6 w-6 mr-3 text-orange-500" />
-                    Leads Calificados y Pre-Cotizaciones
+                    Leads Calificados — InverLand
                   </h2>
                   <p className={`text-sm mt-1 font-light transition-colors duration-200 ${
                     isDarkMode ? 'text-slate-400' : 'text-slate-600'
                   }`}>
-                    Clientes potenciales calificados de forma autónoma basados en su gasto eléctrico superior a $2,500 MXN.
+                    Prospectos inmobiliarios calificados por Sofía (compra/renta, presupuesto, zona e interés en stock activo).
                   </p>
                 </div>
               </div>
@@ -324,12 +327,12 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                       isDarkMode ? 'text-slate-100' : 'text-slate-900'
                     }`}>
                       <Zap className="h-5 w-5 mr-2 text-orange-500" />
-                      Distribución por Sistema Solar Recomendado
+                      Distribución por Operación / Interés
                     </h3>
                     <p className={`text-xs font-light max-w-md transition-colors duration-200 ${
                       isDarkMode ? 'text-slate-400' : 'text-slate-600'
                     }`}>
-                      Muestra la proporción de proyectos residenciales calificados según la cantidad de paneles solares calculada de forma dinámica por la inteligencia artificial de Gemini.
+                      Muestra la proporción de leads según tipo de operación o interés inmobiliario detectado por Sofía.
                     </p>
                     <div className="grid grid-cols-2 gap-2 pt-2">
                       {systemData.map((data, idx) => (
@@ -434,11 +437,11 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                   <div>
                     <h4 className={`font-bold text-lg transition-colors duration-200 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Aún no hay Leads calificados</h4>
                     <p className={`text-sm mt-1 font-light transition-colors duration-200 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Envía mensajes a través de nuestro simulador y responde las preguntas clave de O3 Energy para verlos aparecer aquí en tiempo real.
+                      Envía mensajes a través de nuestro simulador y responde las preguntas clave de Sofía (InverLand) para verlos aparecer aquí en tiempo real.
                     </p>
                   </div>
                   <button
-                    onClick={() => setActiveTab('simulator')}
+                    onClick={() => setActiveTab?.('simulator')}
                     className="bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs py-2.5 px-5 rounded-xl transition cursor-pointer"
                   >
                     Simular Primer Lead en vivo →
@@ -515,16 +518,24 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                             isDarkMode ? 'border-slate-800/60' : 'border-slate-200'
                           }`}>
                             <div className="flex justify-between items-center">
-                              <span className="text-slate-500">Gasto CFE (Recibo):</span>
-                              <span className={`font-bold transition-colors duration-200 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{lead.montoRecibo}</span>
-                            </div>
-                            <div className="flex justify-between items-start">
-                              <span className="text-slate-500">Sistema Estimado:</span>
-                              <span className={`font-semibold text-right transition-colors duration-200 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{lead.sistemaEstimado}</span>
+                              <span className="text-slate-500">Operación:</span>
+                              <span className={`font-bold transition-colors duration-200 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{lead.operationType || '—'}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                              <span className="text-slate-500">Inversión Aprox:</span>
-                              <span className="font-bold text-orange-500 text-sm">{lead.costoEstimado}</span>
+                              <span className="text-slate-500">Presupuesto:</span>
+                              <span className={`font-bold transition-colors duration-200 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{lead.budget || lead.montoRecibo || '—'}</span>
+                            </div>
+                            <div className="flex justify-between items-start">
+                              <span className="text-slate-500">Zonas:</span>
+                              <span className={`font-semibold text-right transition-colors duration-200 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{lead.preferredZones || '—'}</span>
+                            </div>
+                            <div className="flex justify-between items-start">
+                              <span className="text-slate-500">Interés:</span>
+                              <span className={`font-semibold text-right transition-colors duration-200 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{lead.matchedPropertyTitles || lead.sistemaEstimado || '—'}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500">Precio ref.:</span>
+                              <span className="font-bold text-orange-500 text-sm">{lead.costoEstimado || '—'}</span>
                             </div>
                           </div>
 

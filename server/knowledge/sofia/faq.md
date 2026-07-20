@@ -1,23 +1,54 @@
-# FAQ — O3 Energy México (Base de Conocimiento de Sofía)
+# FAQ — Inverland Real Estate (Base de Conocimiento de Sofía)
 
-## Funcionamiento en días nublados
-Los paneles solares siguen generando energía en días nublados, aunque a una capacidad reducida (entre 10% y 25% de su rendimiento máximo). El sistema aprovecha la luz difusa, no directamente el calor del sol.
+## ¿Quién es InverLand y en qué zonas opera?
+Inverland Real Estate (Grupo Inverland) es una inmobiliaria con oficina en León, Guanajuato (Calle Nubes 219, Col. Jardines del Moral, 37160). Atiende principalmente León y zona metropolitana; también puede asesorar sobre oportunidades en otras plazas según el stock activo en plataforma.
 
-## Protección anti-isla (apagones de CFE)
-Por norma oficial de la CRE (Comisión Reguladora de Energía), los sistemas interconectados a la red CFE se apagan automáticamente durante un corte de luz. Esto protege a los trabajadores de CFE. Si el cliente desea energía durante apagones, se requiere batería de respaldo (costo adicional).
+## ¿Qué tipos de inmuebles manejan?
+Casa, Departamento, Terreno, Oficina, Local Comercial, Bodega Industrial, Loft, Villa y Hacienda, según lo publicado en el inventario activo.
 
-## Mantenimiento y limpieza
-Se recomienda limpieza cada 4 a 6 meses, dependiendo de la cantidad de polvo o suciedad local. El proceso es simple: agua y jabón neutro con un trapo suave. No se necesita contratación de servicio especializado.
+## ¿Venden y rentan?
+Sí. Sofía solo ofrece inmuebles **activos** en stock con operación Venta, Renta o Renta temporal. No inventa propiedades ni promociona preventas/desarrollos en esta etapa.
 
-## Trámite de interconexión con CFE
-El proceso de gestión oficial con CFE para obtener el medidor bidireccional tarda entre 4 y 12 semanas (promedio 8 semanas). Durante ese periodo, el sistema puede instalarse y comenzar a operar, pero el excedente no se "regresa" a la red hasta la aprobación oficial. El cliente seguirá recibiendo su recibo de CFE por la cuota de conexión mínima (alrededor de $90-$150 MXN bimestrales) incluso si genera el 100% de su consumo.
+## ¿Cómo agenda una visita?
+Cuando el cliente muestra interés en un inmueble del stock, Sofía registra el lead calificado y un asesor humano de InverLand contacta para agendar la visita. También pueden escribir o llamar a los canales oficiales.
 
-## Garantías
-- Paneles solares: 25 años de garantía de rendimiento (generalmente 80% de eficiencia mínima garantizada al año 25).
-- Inversor: 5 a 10 años de garantía según el fabricante.
-- Instalación física: 1 año de garantía de mano de obra de O3 Energy México.
+## ¿Qué documentos piden para compra / renta?
+Varía según operación y requisito del propietario. En general: identificación oficial, comprobantes de ingresos y, en renta, referencias. Un asesor confirma la lista exacta caso por caso.
 
-## Financiamiento
-- **Contado:** 50% de anticipo al firmar el contrato. 50% restante a la instalación.
-- **Financiamiento con financiera:** Tasa del 4% mensual sobre saldos insolutos. Plazos disponibles: 12, 24 o 36 meses. Enganche mínimo del 10%.
-  - Requisitos: INE/IFE vigente, 2 comprobantes de domicilio, Estado de cuenta bancario (3 meses), Situación fiscal (constancia del SAT), Comprobante de ingresos.
+## ¿Ofrecen asesoría de crédito hipotecario?
+InverLand orienta e intermedía; puede canalizar con asesores de crédito según el perfil del cliente. Sofía no aprueba créditos ni calcula tablas de amortización oficiales.
+
+## ¿Cobran comisión al comprador / inquilino?
+Las condiciones comerciales las confirma un asesor humano. Sofía no inventa porcentajes de comisión.
+
+## Horarios de atención y oficinas
+Lunes a Viernes de 9:00 a 18:00 hrs. Oficina: Calle Nubes 219, Col. Jardines del Moral, León, Gto.
+
+## Teléfonos y WhatsApp oficiales
+- Teléfono / WhatsApp empresa: +52 479 216 1683
+- Correo: hola@inverland.mx
+- Sitio: https://www.inverland.mx/
+
+## ¿Los precios incluyen IVA / mantenimiento / predial?
+Los precios publicados en plataforma son los del anuncio. Mantenimiento, predial, IVA u otros gastos se confirman con el asesor según cada inmueble.
+
+## ¿Puedo negociar el precio publicado?
+Es posible según el propietario. Un asesor humano gestiona ofertas formales.
+
+## Proceso típico de compra
+Interés → visita → oferta/apartado → contrato → escritura / cierre. Sofía califica y presenta stock; el cierre lo lleva el equipo comercial.
+
+## Proceso típico de renta
+Solicitud → investigación / referencias → contrato → depósito e inventario. Detalles los confirma el asesor.
+
+## ¿Publican desarrollos en preventa?
+La plataforma está preparada para preventa, pero **en este momento Sofía solo trabaja con stock activo disponible** (no desarrollos en preventa).
+
+## ¿Qué pasa si no hay exactamente lo que busco?
+Sofía se disculpa, propone las alternativas **más cercanas disponibles en stock activo** y ofrece contacto con un asesor calificado para buscar opciones aunque aún no estén en la plataforma.
+
+## Aviso de privacidad / uso de datos
+Los datos del chat (nombre, teléfono, preferencias) se usan para atención comercial y seguimiento de leads en InverLand, conforme a su aviso de privacidad.
+
+## ¿Sofía puede inventar propiedades?
+**No.** Solo responde con inmuebles activos en la base de datos de InverLand (`properties` con status disponible). Si no hay match, lo dice con claridad.

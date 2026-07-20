@@ -1,4 +1,4 @@
-# Reglas Persistentes del Proyecto Agente Comercial Solar
+# Reglas Persistentes del Proyecto Agente Comercial InverLand
 
 ## REGLA INAMOVIBLE 1: APO (Auditoría Profunda Obligatoria)
 Quedan estrictamente prohibidos los "hotfixes" ciegos o rápidos. Antes de realizar CUALQUIER modificación a una lógica existente, el agente DEBE obligatoriamente:
