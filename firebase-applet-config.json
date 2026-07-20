@@ -1,10 +1,10 @@
 {
   "projectId": "inverland-portal",
-  "appId": "",
-  "apiKey": "",
+  "appId": "1:1033785562131:web:4129fdc09952da2e2f1be6",
+  "apiKey": "AIzaSyBmNiK_SHhm6WwL-P8zwUm4E9GxkSOi4SE",
   "authDomain": "inverland-portal.firebaseapp.com",
   "firestoreDatabaseId": "(default)",
-  "storageBucket": "inverland-portal.appspot.com",
-  "messagingSenderId": "",
+  "storageBucket": "inverland-portal.firebasestorage.app",
+  "messagingSenderId": "1033785562131",
   "measurementId": ""
 }

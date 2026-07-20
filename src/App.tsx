@@ -84,10 +84,10 @@ export default function App() {
       }`}>
         
         {/* BARRA SUPERIOR (TOP BAR) */}
-        <header className={`h-16 border-b flex items-center justify-between px-4 sm:px-6 z-10 shrink-0 transition-colors duration-200 ${
+        <header className={`h-16 border-b flex items-center justify-between px-4 sm:px-6 z-10 shrink-0 relative transition-colors duration-200 ${
           isDarkMode ? 'bg-slate-900 border-slate-800/80' : 'bg-white border-slate-200'
         }`}>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 min-w-0 z-10">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className={`md:hidden p-2 rounded-lg transition-colors ${
@@ -96,7 +96,7 @@ export default function App() {
             >
               <Menu className="h-5 w-5" />
             </button>
-            <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${
+            <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider truncate ${
               isDarkMode ? 'bg-slate-950 text-slate-400 border border-slate-850' : 'bg-slate-100 text-slate-600 border border-slate-200'
             }`}>
               {activeTab === 'chats' ? '💬 Monitor de Chats' : activeTab === 'leads' ? '👥 Leads Calificados' : activeTab === 'copilot' ? '🤖 Copiloto IA (DB)' : activeTab === 'simulator' ? '🧪 Simulador' : '📚 Guía'}
@@ -110,7 +110,13 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <h1 className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-sm sm:text-base font-bold tracking-tight text-center pointer-events-none px-2 max-w-[42%] sm:max-w-none truncate ${
+            isDarkMode ? 'text-inverland-aqua' : 'text-inverland-blue'
+          }`}>
+            Agente Comercial de IA Inverland
+          </h1>
+
+          <div className="flex items-center space-x-4 z-10">
             {/* NOTIFICATION PERMISSION TRIGGER */}
             {'Notification' in window && (
               <button
