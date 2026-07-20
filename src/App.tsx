@@ -288,6 +288,17 @@ export default function App() {
             </div>
           )}
         </div>
+
+        <footer className={`shrink-0 border-t px-4 py-2.5 text-center transition-colors duration-200 ${
+          isDarkMode ? 'bg-slate-900/80 border-slate-800/80' : 'bg-white border-slate-200'
+        }`}>
+          <p className={`text-[11px] tracking-wide ${
+            isDarkMode ? 'text-slate-500' : 'text-slate-500'
+          }`}>
+            © 2026 Powered By <span className={isDarkMode ? 'text-inverland-aqua font-semibold' : 'text-inverland-blue font-semibold'}>PAI-B</span>
+            {' '}Todos los derechos reservados.
+          </p>
+        </footer>
       </main>
     </div>
   );
